@@ -119,6 +119,72 @@ class AuthorizationServerIntegrationTests {
   }
 
   @Test
+  void clientCredentialsWithInvalidScopeIsRejected() throws Exception {
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+    MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+    form.add("grant_type", "client_credentials");
+    form.add("scope", "admin");
+
+    HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(form, headers);
+
+    ResponseEntity<String> response =
+        restTemplate
+            .withBasicAuth("demo-client", "demo-secret")
+            .postForEntity("/oauth2/token", request, String.class);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+    JsonNode body = objectMapper.readTree(response.getBody());
+    assertThat(body.path("error").asText()).isEqualTo("invalid_scope");
+  }
+
+  @Test
+  void unsupportedGrantTypeIsRejected() throws Exception {
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+    MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+    form.add("grant_type", "password");
+    form.add("username", "demo-user");
+    form.add("password", "demo-password");
+
+    HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(form, headers);
+
+    ResponseEntity<String> response =
+        restTemplate
+            .withBasicAuth("demo-client", "demo-secret")
+            .postForEntity("/oauth2/token", request, String.class);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+    JsonNode body = objectMapper.readTree(response.getBody());
+    assertThat(body.path("error").asText()).isEqualTo("unsupported_grant_type");
+  }
+
+  @Test
+  void missingGrantTypeIsRejected() throws Exception {
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+    MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+    form.add("scope", "read");
+
+    HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(form, headers);
+
+    ResponseEntity<String> response =
+        restTemplate
+            .withBasicAuth("demo-client", "demo-secret")
+            .postForEntity("/oauth2/token", request, String.class);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+    JsonNode body = objectMapper.readTree(response.getBody());
+    assertThat(body.path("error").asText()).isEqualTo("invalid_request");
+  }
+
+  @Test
   void authorizationCodeGrantReturnsAccessToken() throws Exception {
     CookieManager cookieManager = new CookieManager();
     cookieManager.setCookiePolicy(CookiePolicy.ACCEPT_ALL);
