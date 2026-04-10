@@ -74,6 +74,20 @@ public class SecurityConfig {
 
   @Bean
   @Order(2)
+  SecurityFilterChain introspectionFilterChain(HttpSecurity http) throws Exception {
+    // Token introspection endpoint handles its own authentication
+    // This filter chain allows the endpoint to respond with JSON error responses
+    http
+        .securityMatcher("/oauth2/introspect")
+        .authorizeHttpRequests((authorize) -> authorize
+            .anyRequest().permitAll()
+        );
+
+    return http.build();
+  }
+
+  @Bean
+  @Order(3)
   SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
     http
         .authorizeHttpRequests((authorize) -> authorize
@@ -109,6 +123,7 @@ public class SecurityConfig {
           .redirectUri("http://127.0.0.1:9000/login/oauth2/code/demo-client")
           .scope("read")
           .scope("write")
+          .scope("introspection")
           .tokenSettings(tokenSettings)
           .build();
 
