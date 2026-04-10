@@ -5,6 +5,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import java.time.Duration;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -33,6 +34,7 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.security.provisioning.JdbcUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
@@ -89,7 +91,8 @@ public class SecurityConfig {
   @Bean
   CommandLineRunner demoRegisteredClientSeeder(
       RegisteredClientRepository registeredClientRepository,
-      PasswordEncoder passwordEncoder) {
+      PasswordEncoder passwordEncoder,
+      TokenSettings tokenSettings) {
     return args -> {
       if (registeredClientRepository.findByClientId("demo-client") != null) {
         return;
@@ -102,9 +105,11 @@ public class SecurityConfig {
           .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
           .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
           .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+          .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
           .redirectUri("http://127.0.0.1:9000/login/oauth2/code/demo-client")
           .scope("read")
           .scope("write")
+          .tokenSettings(tokenSettings)
           .build();
 
       registeredClientRepository.save(registeredClient);
@@ -151,6 +156,15 @@ public class SecurityConfig {
       @Value("${app.issuer-uri}") String issuerUri) {
     return AuthorizationServerSettings.builder()
         .issuer(issuerUri)
+        .build();
+  }
+
+  @Bean
+  TokenSettings tokenSettings() {
+    return TokenSettings.builder()
+        .accessTokenTimeToLive(Duration.ofMinutes(5))
+        .refreshTokenTimeToLive(Duration.ofDays(7))
+        .reuseRefreshTokens(false)
         .build();
   }
 
