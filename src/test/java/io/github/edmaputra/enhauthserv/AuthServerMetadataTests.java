@@ -21,6 +21,7 @@ class AuthServerMetadataTests extends AuthServerIntegrationTests {
     JsonNode body = objectMapper.readTree(response.getBody());
     assertThat(body.path("issuer").asText()).isEqualTo(issuerUri);
     assertThat(body.path("token_endpoint").asText()).isNotBlank();
+    assertThat(body.path("userinfo_endpoint").asText()).isNotBlank();
     assertThat(body.path("jwks_uri").asText()).isNotBlank();
   }
 

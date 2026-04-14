@@ -1,0 +1,14 @@
+package io.github.edmaputra.enhauthserv.repository;
+
+import io.github.edmaputra.enhauthserv.entity.UserProfileAttribute;
+import java.util.List;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface UserProfileAttributeRepository extends JpaRepository<UserProfileAttribute, Long> {
+
+  List<UserProfileAttribute> findByUserProfileUsername(String username);
+
+  boolean existsByUserProfileUsernameAndAttributeKey(String username, String attributeKey);
+}

@@ -13,7 +13,7 @@ class AuthServerAuthorizationFlowTests extends AuthServerIntegrationTests {
 
   @Test
   void authorizationCodeGrantReturnsAccessToken() throws Exception {
-    ResponseEntity<String> tokenResponse = exchangeAuthorizationCodeForTokens("read");
+    ResponseEntity<String> tokenResponse = exchangeAuthorizationCodeForTokens("openid read");
 
     assertThat(tokenResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
@@ -22,6 +22,7 @@ class AuthServerAuthorizationFlowTests extends AuthServerIntegrationTests {
     assertThat(tokenBody.path("refresh_token").asText()).isNotBlank();
     assertThat(tokenBody.path("token_type").asText()).isEqualToIgnoringCase("Bearer");
     assertThat(tokenBody.path("expires_in").asLong()).isGreaterThan(0);
+    assertThat(tokenBody.path("scope").asText()).contains("openid");
     assertThat(tokenBody.path("scope").asText()).contains("read");
   }
 
