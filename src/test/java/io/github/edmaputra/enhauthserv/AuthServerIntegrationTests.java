@@ -3,6 +3,7 @@ package io.github.edmaputra.enhauthserv;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.URI;
@@ -42,6 +43,26 @@ abstract class AuthServerIntegrationTests {
 
   @LocalServerPort
   protected int port;
+
+  protected static final class AuthorizationCodeFlowResult {
+
+    private final HttpClient client;
+
+    private final String idToken;
+
+    private AuthorizationCodeFlowResult(HttpClient client, String idToken) {
+      this.client = client;
+      this.idToken = idToken;
+    }
+
+    HttpClient client() {
+      return this.client;
+    }
+
+    String idToken() {
+      return this.idToken;
+    }
+  }
 
   protected URI appUri(String pathOrAbsoluteUrl) {
     if (pathOrAbsoluteUrl.startsWith("http://") || pathOrAbsoluteUrl.startsWith("https://")) {
@@ -96,6 +117,107 @@ abstract class AuthServerIntegrationTests {
         null,
         true);
   }
+
+  protected AuthorizationCodeFlowResult authenticateDemoUserAndGetIdToken(String scope) throws Exception {
+    CookieManager cookieManager = new CookieManager();
+    cookieManager.setCookiePolicy(CookiePolicy.ACCEPT_ALL);
+
+    HttpClient client = HttpClient.newBuilder()
+      .cookieHandler(cookieManager)
+      .followRedirects(HttpClient.Redirect.NEVER)
+      .build();
+
+    String authorizePath = "/oauth2/authorize"
+        + "?response_type=code"
+        + "&client_id=" + URLEncoder.encode("demo-client", StandardCharsets.UTF_8)
+        + "&redirect_uri=" + URLEncoder.encode("http://127.0.0.1:9000/login/oauth2/code/demo-client",
+            StandardCharsets.UTF_8)
+        + "&scope=" + URLEncoder.encode(scope, StandardCharsets.UTF_8)
+        + "&state=test-state";
+
+    HttpResponse<String> authorizeResponse = client.send(
+        HttpRequest.newBuilder()
+            .uri(appUri(authorizePath))
+            .GET()
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+
+    assertThat(authorizeResponse.statusCode()).isEqualTo(HttpStatus.FOUND.value());
+    String loginLocation = authorizeResponse.headers().firstValue("location").orElseThrow();
+    assertThat(loginLocation).contains("/login");
+
+    HttpResponse<String> loginPageResponse = client.send(
+        HttpRequest.newBuilder()
+            .uri(appUri(loginLocation))
+            .GET()
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+
+    assertThat(loginPageResponse.statusCode()).isEqualTo(HttpStatus.OK.value());
+    String csrfToken = extractCsrfToken(loginPageResponse.body());
+
+    String loginRequestBody = "username=" + urlEncode("demo-user")
+      + "&password=" + urlEncode("demo-password")
+      + "&_csrf=" + urlEncode(csrfToken);
+
+    HttpResponse<String> loginSubmitResponse = client.send(
+        HttpRequest.newBuilder()
+            .uri(appUri("/login"))
+            .header("Content-Type", MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+            .POST(HttpRequest.BodyPublishers.ofString(loginRequestBody))
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+
+    assertThat(loginSubmitResponse.statusCode()).isEqualTo(HttpStatus.FOUND.value());
+
+    String callbackLocation = null;
+    String nextLocation = loginSubmitResponse.headers().firstValue("location").orElseThrow();
+    for (int i = 0; i < 5; i++) {
+      HttpResponse<String> authorizationStepResponse = client.send(
+          HttpRequest.newBuilder()
+              .uri(appUri(nextLocation))
+              .GET()
+              .build(),
+          HttpResponse.BodyHandlers.ofString());
+
+      assertThat(authorizationStepResponse.statusCode()).isEqualTo(HttpStatus.FOUND.value());
+
+      String stepLocation = authorizationStepResponse.headers().firstValue("location").orElseThrow();
+      if (stepLocation.startsWith("http://127.0.0.1:9000/login/oauth2/code/demo-client")) {
+        callbackLocation = stepLocation;
+        break;
+      }
+      nextLocation = stepLocation;
+    }
+
+    assertThat(callbackLocation).isNotNull();
+
+    URI callbackUri = URI.create(callbackLocation);
+    assertThat(callbackUri.getQuery()).contains("code=");
+
+    String authorizationCode = extractQueryParam(callbackUri, "code");
+    assertThat(authorizationCode).isNotBlank();
+
+    HttpHeaders tokenHeaders = new HttpHeaders();
+    tokenHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+    MultiValueMap<String, String> tokenForm = new LinkedMultiValueMap<>();
+    tokenForm.add("grant_type", "authorization_code");
+    tokenForm.add("code", authorizationCode);
+    tokenForm.add("redirect_uri", "http://127.0.0.1:9000/login/oauth2/code/demo-client");
+
+    HttpEntity<MultiValueMap<String, String>> tokenRequest = new HttpEntity<>(tokenForm, tokenHeaders);
+    ResponseEntity<String> tokenResponse = restTemplate
+      .withBasicAuth("demo-client", "demo-secret")
+      .postForEntity("/oauth2/token", tokenRequest, String.class);
+    assertThat(tokenResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+    JsonNode tokenBody = objectMapper.readTree(tokenResponse.getBody());
+    String idToken = tokenBody.path("id_token").asText();
+    assertThat(idToken).isNotBlank();
+
+    return new AuthorizationCodeFlowResult(client, idToken);
+    }
 
   protected ResponseEntity<String> exchangeAuthorizationCodeForTokensWithPkce(
       String scope,

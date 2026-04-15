@@ -56,11 +56,14 @@ import org.springframework.security.oauth2.server.authorization.oidc.authenticat
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.provisioning.JdbcUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 
 @Configuration
@@ -84,8 +87,7 @@ public class SecurityConfig {
                 userInfoEndpoint.userInfoMapper(userInfoMapper)))
         )
         .authorizeHttpRequests((authorize) ->
-            authorize
-                .anyRequest().authenticated()
+            authorize.anyRequest().authenticated()
         )
         // Redirect to the login page when not authenticated from the
         // authorization endpoint
@@ -118,6 +120,7 @@ public class SecurityConfig {
   SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
     http
         .authorizeHttpRequests((authorize) -> authorize
+        .requestMatchers("/logged-out").permitAll()
             .anyRequest().authenticated())
         .formLogin(Customizer.withDefaults());
 
@@ -160,6 +163,7 @@ public class SecurityConfig {
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
             .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
             .redirectUri("http://127.0.0.1:9000/login/oauth2/code/demo-client")
+            .postLogoutRedirectUri("http://127.0.0.1:9000/logged-out")
             .scope("openid")
             .scope("profile")
             .scope("email")
@@ -179,6 +183,7 @@ public class SecurityConfig {
             .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
             .redirectUri("http://127.0.0.1:9000/login/oauth2/code/pkce-public-client")
+            .postLogoutRedirectUri("http://127.0.0.1:9000/logged-out")
             .scope("openid")
             .scope("profile")
             .scope("email")
@@ -195,6 +200,16 @@ public class SecurityConfig {
   @Bean
   JdbcUserDetailsManager userDetailsService(DataSource dataSource) {
     return new JdbcUserDetailsManager(dataSource);
+  }
+
+  @Bean
+  SessionRegistry sessionRegistry() {
+    return new SessionRegistryImpl();
+  }
+
+  @Bean
+  HttpSessionEventPublisher httpSessionEventPublisher() {
+    return new HttpSessionEventPublisher();
   }
 
   @Bean

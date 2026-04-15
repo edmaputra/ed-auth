@@ -22,6 +22,7 @@ class AuthServerMetadataTests extends AuthServerIntegrationTests {
     assertThat(body.path("issuer").asText()).isEqualTo(issuerUri);
     assertThat(body.path("token_endpoint").asText()).isNotBlank();
     assertThat(body.path("userinfo_endpoint").asText()).isNotBlank();
+    assertThat(body.path("end_session_endpoint").asText()).isNotBlank();
     assertThat(body.path("jwks_uri").asText()).isNotBlank();
   }
 
