@@ -14,18 +14,21 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import java.time.Instant;
-import java.time.Duration;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import javax.sql.DataSource;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -58,6 +61,8 @@ import org.springframework.security.oauth2.server.authorization.settings.ClientS
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.provisioning.JdbcUserDetailsManager;
@@ -68,6 +73,7 @@ import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
+@EnableConfigurationProperties(TokenPolicyProperties.class)
 public class SecurityConfig {
 
   @Bean
@@ -342,9 +348,14 @@ public class SecurityConfig {
   }
 
   @Bean
-  OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(UserProfileService userProfileService) {
+  OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
+      UserProfileService userProfileService,
+      TokenPolicyProperties tokenPolicyProperties) {
     return (context) -> {
       if (AuthorizationGrantType.CLIENT_CREDENTIALS.equals(context.getAuthorizationGrantType())) {
+        if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
+          validateClientCredentialsScopes(context.getAuthorizedScopes(), tokenPolicyProperties);
+        }
         return;
       }
 
@@ -391,12 +402,40 @@ public class SecurityConfig {
   }
 
   @Bean
-  TokenSettings tokenSettings() {
+  TokenSettings tokenSettings(TokenPolicyProperties tokenPolicyProperties) {
     return TokenSettings.builder()
-        .accessTokenTimeToLive(Duration.ofMinutes(5))
-        .refreshTokenTimeToLive(Duration.ofDays(7))
-        .reuseRefreshTokens(false)
+        .accessTokenTimeToLive(tokenPolicyProperties.getAccessTokenTimeToLive())
+        .refreshTokenTimeToLive(tokenPolicyProperties.getRefreshTokenTimeToLive())
+        .reuseRefreshTokens(tokenPolicyProperties.isReuseRefreshTokens())
         .build();
+  }
+
+  private static void validateClientCredentialsScopes(
+      Set<String> requestedScopes,
+      TokenPolicyProperties tokenPolicyProperties) {
+    if (requestedScopes == null || requestedScopes.isEmpty()) {
+      return;
+    }
+
+    Set<String> normalizedAllowedScopes = new HashSet<>();
+    for (String allowedScope : tokenPolicyProperties.getClientCredentialsAllowedScopes()) {
+      normalizedAllowedScopes.add(allowedScope.toLowerCase(Locale.ROOT));
+    }
+
+    Set<String> disallowedScopes = new HashSet<>();
+    for (String requestedScope : requestedScopes) {
+      if (!normalizedAllowedScopes.contains(requestedScope.toLowerCase(Locale.ROOT))) {
+        disallowedScopes.add(requestedScope);
+      }
+    }
+
+    if (disallowedScopes.isEmpty()) {
+      return;
+    }
+
+    String description = "Scope not allowed for client_credentials grant: "
+        + String.join(", ", disallowedScopes);
+    throw new OAuth2AuthenticationException(new OAuth2Error("invalid_scope", description, null));
   }
 
   private static RSAKey generateRsaKey() {
