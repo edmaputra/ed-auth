@@ -3,9 +3,6 @@ CREATE TABLE IF NOT EXISTS user_profile_attributes (
     username varchar(50) NOT NULL,
     attribute_key varchar(120) NOT NULL,
     attribute_value varchar(1000) NOT NULL,
-    include_in_userinfo boolean NOT NULL,
-    include_in_id_token boolean NOT NULL,
-    include_in_access_token boolean NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT fk_user_profile_attributes_profile
         FOREIGN KEY (username) REFERENCES user_profiles (username)
