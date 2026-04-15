@@ -7,6 +7,7 @@ import io.github.edmaputra.enhauthserv.entity.UserProfileAttribute;
 import io.github.edmaputra.enhauthserv.repository.ClaimInclusionRuleRepository;
 import io.github.edmaputra.enhauthserv.repository.UserProfileAttributeRepository;
 import io.github.edmaputra.enhauthserv.repository.UserProfileRepository;
+import io.github.edmaputra.enhauthserv.tenant.TenantContext;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,6 +21,8 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class UserProfileService {
 
+  private static final String DEFAULT_TENANT = "demo";
+
   private static final Set<String> RESERVED_CLAIMS = Set.of(
       "sub", "iss", "aud", "exp", "iat", "nbf", "jti", "scope", "client_id", "azp", "token_type",
       "auth_time", "nonce", "at_hash", "c_hash", "sid", "amr", "acr");
@@ -29,8 +32,9 @@ public class UserProfileService {
   private final ClaimInclusionRuleRepository claimInclusionRuleRepository;
 
   public UserProfile getOrDefault(String username) {
-    return userProfileRepository.findByUsername(username)
-        .orElseGet(() -> defaultProfile(username));
+    String tenantId = resolveTenantId();
+    return userProfileRepository.findByTenantAndUsername(tenantId, username)
+      .orElseGet(() -> defaultProfile(username, tenantId));
   }
 
   public Map<String, Object> getUserInfoAttributes(String username) {
@@ -45,7 +49,7 @@ public class UserProfileService {
     return toClaimMap(username, ClaimTarget.ACCESS_TOKEN);
   }
 
-  private static UserProfile defaultProfile(String username) {
+  private static UserProfile defaultProfile(String username, String tenantId) {
     return new UserProfile(
         username,
         username,
@@ -54,12 +58,14 @@ public class UserProfileService {
         "en-US",
         "UTC",
         "unknown",
-        "default",
+        tenantId,
         Instant.now().getEpochSecond());
   }
 
   private Map<String, Object> toClaimMap(String username, ClaimTarget target) {
-    List<UserProfileAttribute> attributes = userProfileAttributeRepository.findByUserProfileUsername(username);
+    String tenantId = resolveTenantId();
+    List<UserProfileAttribute> attributes =
+        userProfileAttributeRepository.findByTenantIdAndUserProfileUsername(tenantId, username);
     if (attributes.isEmpty()) {
       return Map.of();
     }
@@ -69,7 +75,8 @@ public class UserProfileService {
         .filter((key) -> key != null && !key.isBlank())
         .collect(Collectors.toSet());
 
-    Map<String, ClaimInclusionRule> rulesByKey = claimInclusionRuleRepository.findByAttributeKeyIn(attributeKeys)
+    Map<String, ClaimInclusionRule> rulesByKey =
+      claimInclusionRuleRepository.findByTenantIdAndAttributeKeyIn(tenantId, attributeKeys)
         .stream()
       .collect(Collectors.toMap(ClaimInclusionRule::getAttributeKey, (rule) -> rule));
 
@@ -86,5 +93,9 @@ public class UserProfileService {
       claims.put(key, attribute.getAttributeValue());
     }
     return claims;
+  }
+
+  private String resolveTenantId() {
+    return TenantContext.getCurrentTenantOrDefault(DEFAULT_TENANT);
   }
 }

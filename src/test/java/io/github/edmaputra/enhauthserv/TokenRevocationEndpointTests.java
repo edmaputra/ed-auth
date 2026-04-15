@@ -3,18 +3,35 @@ package io.github.edmaputra.enhauthserv;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.github.edmaputra.enhauthserv.tenant.TenantContext;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
+import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class TokenRevocationEndpointTests extends AuthServerIntegrationTests {
+
+  @Autowired
+  private RegisteredClientRepository registeredClientRepository;
+
+  @Autowired
+  private PasswordEncoder passwordEncoder;
 
   @Test
   void revokeValidAccessTokenReturnsOkAndMakesTokenInactive() throws Exception {
@@ -78,6 +95,55 @@ class TokenRevocationEndpointTests extends AuthServerIntegrationTests {
     assertThat(body.path("error").asText()).isEqualTo("invalid_client");
   }
 
+  @Test
+  void tenantPathRevocationFromDifferentTenantDoesNotRevokeDemoToken() throws Exception {
+    ensureTenantClient("tenant-b", "tenant-b-revoke-client", "tenant-b-secret", Set.of("revocation", "read"));
+    String demoAccessToken = getAccessToken("demo-client", "demo-secret");
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+    headers.setBasicAuth("tenant-b-revoke-client", "tenant-b-secret");
+
+    MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+    form.add("token", demoAccessToken);
+    form.add("token_type_hint", "access_token");
+
+    ResponseEntity<String> revokeResponse = restTemplate.postForEntity(
+        "/t/{tenant}/oauth2/revoke",
+        new HttpEntity<>(form, headers),
+        String.class,
+        "tenant-b");
+
+    assertThat(revokeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+    ResponseEntity<String> introspectionResponse = introspect(demoAccessToken);
+    assertThat(introspectionResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+    JsonNode introspectionBody = objectMapper.readTree(introspectionResponse.getBody());
+    assertThat(introspectionBody.path("active").asBoolean()).isTrue();
+  }
+
+  @Test
+  void tenantPathRevocationWithMatchingTenantClientDoesNotRedirectToLogin() throws Exception {
+    String demoAccessToken = getAccessToken("demo-client", "demo-secret");
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+    headers.setBasicAuth("demo-client", "demo-secret");
+
+    MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+    form.add("token", demoAccessToken);
+    form.add("token_type_hint", "access_token");
+
+    ResponseEntity<String> revokeResponse = restTemplate.postForEntity(
+        "/t/{tenant}/oauth2/revoke",
+        new HttpEntity<>(form, headers),
+        String.class,
+        "demo");
+
+    assertThat(revokeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+  }
+
   private ResponseEntity<String> revokeToken(String token, String tokenTypeHint) {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -128,5 +194,35 @@ class TokenRevocationEndpointTests extends AuthServerIntegrationTests {
 
     JsonNode body = objectMapper.readTree(response.getBody());
     return body.path("access_token").asText();
+  }
+
+  private void ensureTenantClient(
+      String tenant,
+      String clientId,
+      String clientSecret,
+      Set<String> scopes) {
+    TenantContext.setCurrentTenant(tenant);
+    try {
+      if (registeredClientRepository.findByClientId(clientId) != null) {
+        return;
+      }
+
+      RegisteredClient.Builder builder = RegisteredClient.withId(UUID.randomUUID().toString())
+          .clientId(clientId)
+          .clientSecret(passwordEncoder.encode(clientSecret))
+          .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+          .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
+          .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+          .clientSettings(ClientSettings.builder().build())
+          .tokenSettings(TokenSettings.builder().build());
+
+      for (String scope : scopes) {
+        builder.scope(scope);
+      }
+
+      registeredClientRepository.save(builder.build());
+    } finally {
+      TenantContext.clear();
+    }
   }
 }

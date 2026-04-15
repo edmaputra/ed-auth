@@ -18,6 +18,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ClaimInclusionRule {
 
+  @Column(name = "tenant_id", nullable = false, length = 100)
+  private String tenantId;
+
   @Id
   @Column(name = "attribute_key", nullable = false, length = 120)
   private String attributeKey;
@@ -26,6 +29,11 @@ public class ClaimInclusionRule {
   private String targets;
 
   public ClaimInclusionRule(String attributeKey) {
+    this("demo", attributeKey);
+  }
+
+  public ClaimInclusionRule(String tenantId, String attributeKey) {
+    this.tenantId = tenantId;
     this.attributeKey = attributeKey;
     this.targets = "";
   }

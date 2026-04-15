@@ -8,6 +8,10 @@ import io.github.edmaputra.enhauthserv.repository.ClaimInclusionRuleRepository;
 import io.github.edmaputra.enhauthserv.repository.UserProfileAttributeRepository;
 import io.github.edmaputra.enhauthserv.repository.UserProfileRepository;
 import io.github.edmaputra.enhauthserv.service.UserProfileService;
+import io.github.edmaputra.enhauthserv.tenant.TenantAwareOAuth2AuthorizationConsentService;
+import io.github.edmaputra.enhauthserv.tenant.TenantAwareOAuth2AuthorizationService;
+import io.github.edmaputra.enhauthserv.tenant.TenantAwareRegisteredClientRepository;
+import io.github.edmaputra.enhauthserv.tenant.TenantContextFilter;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -33,8 +37,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.core.Ordered;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -47,12 +53,9 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
-import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
-import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
-import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationContext;
@@ -70,14 +73,40 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
 @EnableConfigurationProperties(TokenPolicyProperties.class)
 public class SecurityConfig {
 
+  private static final String DEMO_TENANT = "demo";
+
+  @Bean
+  FilterRegistrationBean<TenantContextFilter> tenantContextFilterRegistration(
+      TenantContextFilter tenantContextFilter) {
+    FilterRegistrationBean<TenantContextFilter> registrationBean =
+        new FilterRegistrationBean<>(tenantContextFilter);
+    registrationBean.setOrder(Ordered.HIGHEST_PRECEDENCE);
+    registrationBean.addUrlPatterns("/*");
+    return registrationBean;
+  }
+
   @Bean
   @Order(1)
+  SecurityFilterChain tenantMachineEndpointsFilterChain(HttpSecurity http) throws Exception {
+    http
+      .securityMatcher(new OrRequestMatcher(
+          PathPatternRequestMatcher.withDefaults().matcher("/t/{tenant}/oauth2/introspect"),
+          PathPatternRequestMatcher.withDefaults().matcher("/t/{tenant}/oauth2/revoke")))
+      .authorizeHttpRequests((authorize) -> authorize.anyRequest().permitAll());
+
+    return http.build();
+  }
+
+  @Bean
+  @Order(2)
   SecurityFilterChain authorizationServerSecurityFilterChain(
       HttpSecurity http,
       Function<OidcUserInfoAuthenticationContext, OidcUserInfo> userInfoMapper)
@@ -108,12 +137,14 @@ public class SecurityConfig {
   }
 
   @Bean
-  @Order(2)
+  @Order(3)
   SecurityFilterChain introspectionFilterChain(HttpSecurity http) throws Exception {
     // Custom machine-to-machine endpoints handle their own client authentication.
     // This filter chain ensures JSON responses instead of login redirects.
     http
-      .securityMatcher("/oauth2/introspect", "/oauth2/revoke")
+      .securityMatcher(
+          "/oauth2/introspect",
+          "/oauth2/revoke")
         .authorizeHttpRequests((authorize) -> authorize
             .anyRequest().permitAll()
         );
@@ -122,11 +153,12 @@ public class SecurityConfig {
   }
 
   @Bean
-  @Order(3)
+  @Order(4)
   SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
     http
         .authorizeHttpRequests((authorize) -> authorize
-        .requestMatchers("/logged-out").permitAll()
+      .requestMatchers("/logged-out", "/t/*/.well-known/openid-configuration", "/t/*/oauth2/jwks")
+        .permitAll()
             .anyRequest().authenticated())
         .formLogin(Customizer.withDefaults());
 
@@ -135,21 +167,21 @@ public class SecurityConfig {
 
   @Bean
   RegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate) {
-    return new JdbcRegisteredClientRepository(jdbcTemplate);
+    return new TenantAwareRegisteredClientRepository(jdbcTemplate);
   }
 
   @Bean
   OAuth2AuthorizationService authorizationService(
       JdbcTemplate jdbcTemplate,
       RegisteredClientRepository registeredClientRepository) {
-    return new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+    return new TenantAwareOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
   }
 
   @Bean
   OAuth2AuthorizationConsentService authorizationConsentService(
       JdbcTemplate jdbcTemplate,
       RegisteredClientRepository registeredClientRepository) {
-    return new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClientRepository);
+    return new TenantAwareOAuth2AuthorizationConsentService(jdbcTemplate, registeredClientRepository);
   }
 
   @Bean
@@ -241,7 +273,7 @@ public class SecurityConfig {
   @Order(3)
   CommandLineRunner demoUserProfileSeeder(UserProfileRepository userProfileRepository) {
     return args -> {
-      if (userProfileRepository.findByUsername("demo-user").isPresent()) {
+      if (userProfileRepository.findByTenantAndUsername(DEMO_TENANT, "demo-user").isPresent()) {
         return;
       }
 
@@ -253,7 +285,7 @@ public class SecurityConfig {
           "en-US",
           "Asia/Jakarta",
           "engineering",
-          "demo",
+          DEMO_TENANT,
           Instant.now().getEpochSecond());
 
       userProfileRepository.save(userProfile);
@@ -266,7 +298,8 @@ public class SecurityConfig {
       UserProfileRepository userProfileRepository,
       UserProfileAttributeRepository userProfileAttributeRepository) {
     return args -> {
-      UserProfile userProfile = userProfileRepository.findByUsername("demo-user").orElse(null);
+      UserProfile userProfile =
+          userProfileRepository.findByTenantAndUsername(DEMO_TENANT, "demo-user").orElse(null);
       if (userProfile == null) {
         return;
       }
@@ -296,28 +329,34 @@ public class SecurityConfig {
     return args -> {
       createRuleTargetIfMissing(
         claimInclusionRuleRepository,
+        DEMO_TENANT,
         "favorite_color",
         ClaimTarget.USERINFO);
       createRuleTargetIfMissing(
         claimInclusionRuleRepository,
+        DEMO_TENANT,
         "favorite_color",
         ClaimTarget.ACCESS_TOKEN);
 
       createRuleTargetIfMissing(
         claimInclusionRuleRepository,
+        DEMO_TENANT,
         "employee_level",
         ClaimTarget.ID_TOKEN);
       createRuleTargetIfMissing(
         claimInclusionRuleRepository,
+        DEMO_TENANT,
         "employee_level",
         ClaimTarget.ACCESS_TOKEN);
 
       createRuleTargetIfMissing(
         claimInclusionRuleRepository,
+        DEMO_TENANT,
         "region",
         ClaimTarget.USERINFO);
       createRuleTargetIfMissing(
         claimInclusionRuleRepository,
+        DEMO_TENANT,
         "region",
         ClaimTarget.ID_TOKEN);
     };
@@ -464,8 +503,8 @@ public class SecurityConfig {
       UserProfileAttributeRepository userProfileAttributeRepository,
       String key,
       String value) {
-    if (userProfileAttributeRepository.existsByUserProfileUsernameAndAttributeKey(
-        userProfile.getUsername(), key)) {
+    if (userProfileAttributeRepository.existsByTenantIdAndUserProfileUsernameAndAttributeKey(
+        userProfile.getTenant(), userProfile.getUsername(), key)) {
       return;
     }
 
@@ -478,10 +517,12 @@ public class SecurityConfig {
 
   private static void createRuleTargetIfMissing(
       ClaimInclusionRuleRepository claimInclusionRuleRepository,
+      String tenantId,
       String attributeKey,
       ClaimTarget target) {
-    ClaimInclusionRule rule = claimInclusionRuleRepository.findById(attributeKey)
-        .orElseGet(() -> claimInclusionRuleRepository.save(new ClaimInclusionRule(attributeKey)));
+    ClaimInclusionRule rule = claimInclusionRuleRepository
+        .findByTenantIdAndAttributeKey(tenantId, attributeKey)
+        .orElseGet(() -> claimInclusionRuleRepository.save(new ClaimInclusionRule(tenantId, attributeKey)));
 
     if (rule.includesTarget(target)) {
       return;

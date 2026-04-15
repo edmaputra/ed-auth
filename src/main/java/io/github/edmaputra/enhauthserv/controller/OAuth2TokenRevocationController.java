@@ -15,6 +15,7 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Request Parameters: token (required), token_type_hint (optional)
  */
 @RestController
-@RequestMapping("/oauth2/revoke")
+@RequestMapping({"/oauth2/revoke", "/t/{tenant}/oauth2/revoke"})
 @Slf4j
 @RequiredArgsConstructor
 public class OAuth2TokenRevocationController {
@@ -38,6 +39,7 @@ public class OAuth2TokenRevocationController {
 
   @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
   public ResponseEntity<?> revoke(
+      @PathVariable(value = "tenant", required = false) String tenant,
       @RequestParam(value = "token", required = false) String token,
       @RequestParam(value = "token_type_hint", required = false) String tokenTypeHint,
       HttpServletRequest request) {

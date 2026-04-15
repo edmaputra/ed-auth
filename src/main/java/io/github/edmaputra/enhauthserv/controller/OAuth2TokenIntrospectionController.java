@@ -23,7 +23,7 @@ import java.util.*;
  * Response: JSON with RFC 7662 fields (active, scope, client_id, etc.)
  */
 @RestController
-@RequestMapping("/oauth2/introspect")
+@RequestMapping({"/oauth2/introspect", "/t/{tenant}/oauth2/introspect"})
 @Slf4j
 @RequiredArgsConstructor
 public class OAuth2TokenIntrospectionController {
@@ -41,6 +41,7 @@ public class OAuth2TokenIntrospectionController {
      */
     @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> introspect(
+        @PathVariable(required = false) String tenant,
             @RequestParam(value = "token", required = false) String token,
             HttpServletRequest request) {
 
