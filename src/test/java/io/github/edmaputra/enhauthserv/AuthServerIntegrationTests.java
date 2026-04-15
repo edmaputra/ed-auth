@@ -86,6 +86,42 @@ abstract class AuthServerIntegrationTests {
   }
 
   protected ResponseEntity<String> exchangeAuthorizationCodeForTokens(String scope) throws Exception {
+    return exchangeAuthorizationCodeForTokens(
+        "demo-client",
+        "demo-secret",
+        "http://127.0.0.1:9000/login/oauth2/code/demo-client",
+        scope,
+        null,
+        null,
+        null,
+        true);
+  }
+
+  protected ResponseEntity<String> exchangeAuthorizationCodeForTokensWithPkce(
+      String scope,
+      String codeChallengeMethod,
+      String codeChallenge,
+      String codeVerifier) throws Exception {
+    return exchangeAuthorizationCodeForTokens(
+        "pkce-public-client",
+        null,
+        "http://127.0.0.1:9000/login/oauth2/code/pkce-public-client",
+        scope,
+        codeChallengeMethod,
+        codeChallenge,
+        codeVerifier,
+        false);
+  }
+
+  private ResponseEntity<String> exchangeAuthorizationCodeForTokens(
+      String clientId,
+      String clientSecret,
+      String redirectUri,
+      String scope,
+      String codeChallengeMethod,
+      String codeChallenge,
+      String codeVerifier,
+      boolean authenticateClient) throws Exception {
     CookieManager cookieManager = new CookieManager();
     cookieManager.setCookiePolicy(CookiePolicy.ACCEPT_ALL);
 
@@ -94,13 +130,19 @@ abstract class AuthServerIntegrationTests {
         .followRedirects(HttpClient.Redirect.NEVER)
         .build();
 
-    String redirectUri = "http://127.0.0.1:9000/login/oauth2/code/demo-client";
     String authorizePath = "/oauth2/authorize"
         + "?response_type=code"
-        + "&client_id=demo-client"
+        + "&client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
         + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
         + "&scope=" + URLEncoder.encode(scope, StandardCharsets.UTF_8)
         + "&state=test-state";
+
+    if (codeChallenge != null && !codeChallenge.isBlank()) {
+      authorizePath += "&code_challenge=" + URLEncoder.encode(codeChallenge, StandardCharsets.UTF_8);
+      authorizePath += "&code_challenge_method="
+          + URLEncoder.encode(codeChallengeMethod == null ? "S256" : codeChallengeMethod,
+              StandardCharsets.UTF_8);
+    }
 
     HttpResponse<String> authorizeResponse = client.send(
         HttpRequest.newBuilder()
@@ -173,11 +215,21 @@ abstract class AuthServerIntegrationTests {
     tokenForm.add("grant_type", "authorization_code");
     tokenForm.add("code", authorizationCode);
     tokenForm.add("redirect_uri", redirectUri);
+    if (!authenticateClient) {
+      tokenForm.add("client_id", clientId);
+    }
+    if (codeVerifier != null && !codeVerifier.isBlank()) {
+      tokenForm.add("code_verifier", codeVerifier);
+    }
 
     HttpEntity<MultiValueMap<String, String>> tokenRequest = new HttpEntity<>(tokenForm, tokenHeaders);
 
+    if (!authenticateClient) {
+      return restTemplate.postForEntity("/oauth2/token", tokenRequest, String.class);
+    }
+
     return restTemplate
-        .withBasicAuth("demo-client", "demo-secret")
+        .withBasicAuth(clientId, clientSecret)
         .postForEntity("/oauth2/token", tokenRequest, String.class);
   }
 

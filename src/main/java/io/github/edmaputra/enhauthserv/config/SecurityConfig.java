@@ -50,6 +50,7 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationContext;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
@@ -131,29 +132,44 @@ public class SecurityConfig {
       PasswordEncoder passwordEncoder,
       TokenSettings tokenSettings) {
     return args -> {
-      if (registeredClientRepository.findByClientId("demo-client") != null) {
-        return;
+      if (registeredClientRepository.findByClientId("demo-client") == null) {
+        RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
+            .clientId("demo-client")
+            .clientSecret(passwordEncoder.encode("demo-secret"))
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
+            .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+            .redirectUri("http://127.0.0.1:9000/login/oauth2/code/demo-client")
+            .scope("openid")
+            .scope("profile")
+            .scope("email")
+            .scope("read")
+            .scope("write")
+            .scope("introspection")
+            .tokenSettings(tokenSettings)
+            .build();
+
+        registeredClientRepository.save(registeredClient);
       }
 
-      RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
-          .clientId("demo-client")
-          .clientSecret(passwordEncoder.encode("demo-secret"))
-          .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-          .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
-          .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
-          .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-          .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-          .redirectUri("http://127.0.0.1:9000/login/oauth2/code/demo-client")
-          .scope("openid")
-          .scope("profile")
-          .scope("email")
-          .scope("read")
-          .scope("write")
-          .scope("introspection")
-          .tokenSettings(tokenSettings)
-          .build();
+      if (registeredClientRepository.findByClientId("pkce-public-client") == null) {
+        RegisteredClient pkcePublicClient = RegisteredClient.withId(UUID.randomUUID().toString())
+            .clientId("pkce-public-client")
+            .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .redirectUri("http://127.0.0.1:9000/login/oauth2/code/pkce-public-client")
+            .scope("openid")
+            .scope("profile")
+            .scope("email")
+            .scope("read")
+            .clientSettings(ClientSettings.builder().requireProofKey(true).build())
+            .tokenSettings(tokenSettings)
+            .build();
 
-      registeredClientRepository.save(registeredClient);
+        registeredClientRepository.save(pkcePublicClient);
+      }
     };
   }
 
