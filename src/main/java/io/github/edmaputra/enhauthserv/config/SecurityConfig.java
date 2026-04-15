@@ -48,6 +48,10 @@ import org.springframework.security.oauth2.server.authorization.client.JdbcRegis
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
+import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationContext;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
@@ -98,10 +102,10 @@ public class SecurityConfig {
   @Bean
   @Order(2)
   SecurityFilterChain introspectionFilterChain(HttpSecurity http) throws Exception {
-    // Token introspection endpoint handles its own authentication
-    // This filter chain allows the endpoint to respond with JSON error responses
+    // Custom machine-to-machine endpoints handle their own client authentication.
+    // This filter chain ensures JSON responses instead of login redirects.
     http
-        .securityMatcher("/oauth2/introspect")
+      .securityMatcher("/oauth2/introspect", "/oauth2/revoke")
         .authorizeHttpRequests((authorize) -> authorize
             .anyRequest().permitAll()
         );
@@ -123,6 +127,20 @@ public class SecurityConfig {
   @Bean
   RegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate) {
     return new JdbcRegisteredClientRepository(jdbcTemplate);
+  }
+
+  @Bean
+  OAuth2AuthorizationService authorizationService(
+      JdbcTemplate jdbcTemplate,
+      RegisteredClientRepository registeredClientRepository) {
+    return new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+  }
+
+  @Bean
+  OAuth2AuthorizationConsentService authorizationConsentService(
+      JdbcTemplate jdbcTemplate,
+      RegisteredClientRepository registeredClientRepository) {
+    return new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClientRepository);
   }
 
   @Bean
@@ -148,6 +166,7 @@ public class SecurityConfig {
             .scope("read")
             .scope("write")
             .scope("introspection")
+            .scope("revocation")
             .tokenSettings(tokenSettings)
             .build();
 

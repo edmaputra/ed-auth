@@ -4,6 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -22,6 +25,7 @@ import java.util.*;
 public class TokenIntrospectionValidator {
 
     private final JwtDecoder jwtDecoder;
+    private final OAuth2AuthorizationService authorizationService;
 
     /**
      * Introspects a token and returns an RFC 7662 compliant response.
@@ -33,6 +37,14 @@ public class TokenIntrospectionValidator {
         Map<String, Object> response = new HashMap<>();
 
         try {
+            OAuth2Authorization authorization =
+                authorizationService.findByToken(token, OAuth2TokenType.ACCESS_TOKEN);
+            if (authorization == null || authorization.getAccessToken() == null
+                || !authorization.getAccessToken().isActive()) {
+                response.put("active", false);
+                return response;
+            }
+
             Jwt jwt = jwtDecoder.decode(token);
             
             // Token is valid - extract claims and build response

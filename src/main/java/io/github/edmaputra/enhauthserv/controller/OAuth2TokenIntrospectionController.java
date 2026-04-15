@@ -1,5 +1,6 @@
 package io.github.edmaputra.enhauthserv.controller;
 
+import io.github.edmaputra.enhauthserv.service.ClientAuthenticationService;
 import io.github.edmaputra.enhauthserv.service.IntrospectionAuthorizationService;
 import io.github.edmaputra.enhauthserv.service.TokenIntrospectionValidator;
 import lombok.RequiredArgsConstructor;
@@ -7,13 +8,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
-import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -30,10 +28,9 @@ import java.util.*;
 @RequiredArgsConstructor
 public class OAuth2TokenIntrospectionController {
 
+    private final ClientAuthenticationService clientAuthenticationService;
     private final TokenIntrospectionValidator tokenValidator;
     private final IntrospectionAuthorizationService authorizationService;
-    private final RegisteredClientRepository registeredClientRepository;
-    private final PasswordEncoder passwordEncoder;
 
     /**
      * RFC 7662 Token Introspection endpoint.
@@ -57,29 +54,16 @@ public class OAuth2TokenIntrospectionController {
         }
 
         // Step 1: Extract and validate client credentials from Basic Auth
-        String[] clientCredentials = extractClientCredentials(request);
-        if (clientCredentials == null) {
+        ClientAuthenticationService.AuthenticationResult clientAuthentication =
+            clientAuthenticationService.authenticateBasicClient(request);
+        if (!clientAuthentication.authenticated()) {
             log.warn("Token introspection request without valid Basic Auth credentials");
             return buildErrorResponse(HttpStatus.UNAUTHORIZED, "invalid_client",
                     "Client authentication failed");
         }
 
-        String clientId = clientCredentials[0];
-        String clientSecret = clientCredentials[1];
-
-        // Step 2: Authenticate the client
-        RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
-        if (registeredClient == null) {
-            log.warn("Token introspection attempt with unknown client: {}", clientId);
-            return buildErrorResponse(HttpStatus.UNAUTHORIZED, "invalid_client",
-                    "Client authentication failed");
-        }
-
-        if (!isClientSecretValid(registeredClient, clientSecret)) {
-            log.warn("Token introspection attempt with invalid secret for client: {}", clientId);
-            return buildErrorResponse(HttpStatus.UNAUTHORIZED, "invalid_client",
-                    "Client authentication failed");
-        }
+        String clientId = clientAuthentication.clientId();
+        RegisteredClient registeredClient = clientAuthentication.registeredClient();
 
         // Step 3: Check if client is authorized to introspect tokens
         if (!authorizationService.canIntrospect(registeredClient)) {
@@ -97,56 +81,6 @@ public class OAuth2TokenIntrospectionController {
 
         // Step 5: Return RFC 7662 response
         return ResponseEntity.ok(introspectionResponse);
-    }
-
-    /**
-     * Extracts client credentials from HTTP Basic Authentication header.
-     *
-     * @param request the HTTP request
-     * @return array of [clientId, clientSecret], or null if not present or invalid
-     */
-    private String[] extractClientCredentials(HttpServletRequest request) {
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Basic ")) {
-            return null;
-        }
-
-        try {
-            String credentials = new String(
-                    Base64.getDecoder().decode(authHeader.substring(6)),
-                    StandardCharsets.UTF_8);
-            int colonIndex = credentials.indexOf(':');
-            if (colonIndex == -1) {
-                return null;
-            }
-
-            String clientId = credentials.substring(0, colonIndex);
-            String clientSecret = credentials.substring(colonIndex + 1);
-            return new String[]{clientId, clientSecret};
-        } catch (Exception e) {
-            log.debug("Invalid Basic Auth header format", e);
-            return null;
-        }
-    }
-
-    /**
-     * Verifies the client secret matches the registered client's secret.
-     *
-     * Uses Spring Security's PasswordEncoder for secure comparison.
-     *
-     * @param registeredClient the registered client
-     * @param providedSecret the client secret provided in the request
-     * @return true if the secret matches, false otherwise
-     */
-    private boolean isClientSecretValid(RegisteredClient registeredClient, String providedSecret) {
-        String registeredSecret = registeredClient.getClientSecret();
-        if (registeredSecret == null) {
-            // Public clients don't have secrets
-            return providedSecret == null || providedSecret.isEmpty();
-        }
-        
-        // Use PasswordEncoder for secure comparison
-        return passwordEncoder.matches(providedSecret, registeredSecret);
     }
 
     /**
