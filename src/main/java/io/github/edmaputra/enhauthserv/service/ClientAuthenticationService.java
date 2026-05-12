@@ -22,7 +22,11 @@ public class ClientAuthenticationService {
   private final PasswordEncoder passwordEncoder;
 
   public AuthenticationResult authenticateBasicClient(HttpServletRequest request) {
-    String[] clientCredentials = extractClientCredentials(request);
+    return authenticateBasicClient(request.getHeader("Authorization"));
+  }
+
+  public AuthenticationResult authenticateBasicClient(String authorizationHeader) {
+    String[] clientCredentials = extractClientCredentials(authorizationHeader);
     if (clientCredentials == null) {
       return AuthenticationResult.failed(null);
     }
@@ -38,8 +42,7 @@ public class ClientAuthenticationService {
     return AuthenticationResult.success(clientId, registeredClient);
   }
 
-  private String[] extractClientCredentials(HttpServletRequest request) {
-    String authHeader = request.getHeader("Authorization");
+  private String[] extractClientCredentials(String authHeader) {
     if (authHeader == null || !authHeader.startsWith("Basic ")) {
       return null;
     }

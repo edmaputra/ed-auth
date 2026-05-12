@@ -98,6 +98,26 @@ Reserved JWT/OIDC claims are protected and not overwritten by custom attributes.
 - Flyway manages schema migrations.
 - Default runtime database is in-memory H2.
 
+## Tenant Resolution
+
+Tenant identity is resolved in this order:
+1. Header (default: `X-Tenant-ID`)
+2. Legacy path prefix (`/t/{tenant}/...`)
+3. Optional strict rejection (`invalid_request`) when unresolved
+
+### Tenant resolution properties
+- `tenant.resolution.header-enabled` (default `true`)
+- `tenant.resolution.path-enabled` (default `true`)
+- `tenant.resolution.header-name` (default `X-Tenant-ID`)
+- `tenant.resolution.require-explicit-tenant` (default `false`)
+- `tenant.resolution.enforce-trusted-proxy-for-header` (default `false`)
+- `tenant.resolution.header-trusted-sources` (default loopback addresses)
+
+### Header trust boundary guidance
+- Enable `tenant.resolution.enforce-trusted-proxy-for-header=true` in production.
+- Configure your edge proxy/API gateway to strip external tenant headers and inject a trusted value.
+- Keep `tenant.resolution.header-trusted-sources` aligned with proxy addresses.
+
 ## Error Patterns
 Common OAuth errors returned by endpoints:
 - `invalid_client`: bad or missing client credentials
@@ -158,6 +178,16 @@ First get a token from step 3, then:
 ACCESS_TOKEN="<paste_access_token_here>"
 
 curl -s -u demo-client:demo-secret \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "token=${ACCESS_TOKEN}" \
+  http://localhost:9000/oauth2/introspect | jq
+```
+
+Header-based tenant form:
+
+```bash
+curl -s -u demo-client:demo-secret \
+  -H "X-Tenant-ID: demo" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "token=${ACCESS_TOKEN}" \
   http://localhost:9000/oauth2/introspect | jq

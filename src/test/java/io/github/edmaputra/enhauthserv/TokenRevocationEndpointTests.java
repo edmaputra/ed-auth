@@ -144,6 +144,91 @@ class TokenRevocationEndpointTests extends AuthServerIntegrationTests {
     assertThat(revokeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
   }
 
+  @Test
+  void headerTenantRevocationWithMatchingTenantClientDoesNotRedirectToLogin() throws Exception {
+    String demoAccessToken = getAccessToken("demo-client", "demo-secret");
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+    headers.setBasicAuth("demo-client", "demo-secret");
+    headers.set("X-Tenant-ID", "demo");
+
+    MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+    form.add("token", demoAccessToken);
+    form.add("token_type_hint", "access_token");
+
+    ResponseEntity<String> revokeResponse = restTemplate.postForEntity(
+        "/oauth2/revoke",
+        new HttpEntity<>(form, headers),
+        String.class);
+
+    assertThat(revokeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+  }
+
+  @Test
+  void headerTenantRevocationFromDifferentTenantDoesNotRevokeDemoToken() throws Exception {
+    ensureTenantClient("tenant-b", "tenant-b-revoke-client", "tenant-b-secret", Set.of("revocation", "read"));
+    String demoAccessToken = getAccessToken("demo-client", "demo-secret");
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+    headers.setBasicAuth("tenant-b-revoke-client", "tenant-b-secret");
+    headers.set("X-Tenant-ID", "tenant-b");
+
+    MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+    form.add("token", demoAccessToken);
+    form.add("token_type_hint", "access_token");
+
+    ResponseEntity<String> revokeResponse = restTemplate.postForEntity(
+        "/oauth2/revoke",
+        new HttpEntity<>(form, headers),
+        String.class);
+
+    assertThat(revokeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+    ResponseEntity<String> introspectionResponse = introspect(demoAccessToken);
+    assertThat(introspectionResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+    JsonNode introspectionBody = objectMapper.readTree(introspectionResponse.getBody());
+    assertThat(introspectionBody.path("active").asBoolean()).isTrue();
+  }
+
+  @Test
+  void headerTenantRevocationOverridesPathTenantWhenBothArePresent() throws Exception {
+    ensureTenantClient("tenant-b", "tenant-b-revoke-client", "tenant-b-secret", Set.of("revocation", "read"));
+    String demoAccessToken = getAccessToken("demo-client", "demo-secret");
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+    headers.setBasicAuth("tenant-b-revoke-client", "tenant-b-secret");
+    headers.set("X-Tenant-ID", "tenant-b");
+
+    MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+    form.add("token", demoAccessToken);
+    form.add("token_type_hint", "access_token");
+
+    ResponseEntity<String> revokeResponse = restTemplate.postForEntity(
+        "/t/{tenant}/oauth2/revoke",
+        new HttpEntity<>(form, headers),
+        String.class,
+        "demo");
+
+    assertThat(revokeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+    HttpHeaders introspectHeaders = new HttpHeaders();
+    introspectHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+    MultiValueMap<String, String> introspectForm = new LinkedMultiValueMap<>();
+    introspectForm.add("token", demoAccessToken);
+
+    ResponseEntity<String> introspectionResponse = restTemplate
+        .withBasicAuth("demo-client", "demo-secret")
+        .postForEntity("/oauth2/introspect", new HttpEntity<>(introspectForm, introspectHeaders), String.class);
+
+    assertThat(introspectionResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode introspectionBody = objectMapper.readTree(introspectionResponse.getBody());
+    assertThat(introspectionBody.path("active").asBoolean()).isTrue();
+  }
+
   private ResponseEntity<String> revokeToken(String token, String tokenTypeHint) {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);

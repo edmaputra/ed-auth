@@ -129,6 +129,7 @@ class TokenIntrospectionEndpointTests extends AuthServerIntegrationTests {
         // If the controller is reached, it will return JSON error with 401
         // Either way, the request is rejected
         String responseBody = response.getBody();
+        assertThat(responseBody).isNotNull();
         boolean isHtmlResponse = responseBody.contains("<!DOCTYPE") || responseBody.contains("<html");
         boolean isJsonError = responseBody.contains("\"error\"") || responseBody.contains("'error'");
 
@@ -388,6 +389,75 @@ class TokenIntrospectionEndpointTests extends AuthServerIntegrationTests {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         JsonNode body = objectMapper.readTree(response.getBody());
         assertThat(body.path("active").asBoolean()).isTrue();
+    }
+
+    @Test
+    void headerTenantIntrospectionWithMatchingTenantClientReturnsActive() throws Exception {
+        String demoAccessToken = getAccessToken("demo-client", "demo-secret");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setBasicAuth("demo-client", "demo-secret");
+        headers.set("X-Tenant-ID", "demo");
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("token", demoAccessToken);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/oauth2/introspect",
+            new HttpEntity<>(form, headers),
+            String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertThat(body.path("active").asBoolean()).isTrue();
+    }
+
+    @Test
+    void headerTenantIntrospectionWithDifferentTenantReturnsInactive() throws Exception {
+        ensureTenantClient("tenant-b", "tenant-b-introspect-client", "tenant-b-secret", Set.of("introspection", "read"));
+        String demoAccessToken = getAccessToken("demo-client", "demo-secret");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setBasicAuth("tenant-b-introspect-client", "tenant-b-secret");
+        headers.set("X-Tenant-ID", "tenant-b");
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("token", demoAccessToken);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/oauth2/introspect",
+            new HttpEntity<>(form, headers),
+            String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertThat(body.path("active").asBoolean()).isFalse();
+    }
+
+    @Test
+    void headerTenantIntrospectionOverridesPathTenantWhenBothArePresent() throws Exception {
+        ensureTenantClient("tenant-b", "tenant-b-introspect-client", "tenant-b-secret", Set.of("introspection", "read"));
+        String demoAccessToken = getAccessToken("demo-client", "demo-secret");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setBasicAuth("tenant-b-introspect-client", "tenant-b-secret");
+        headers.set("X-Tenant-ID", "tenant-b");
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("token", demoAccessToken);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/t/{tenant}/oauth2/introspect",
+            new HttpEntity<>(form, headers),
+            String.class,
+            "demo");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertThat(body.path("active").asBoolean()).isFalse();
     }
 
     // ==================== Helper Methods ====================

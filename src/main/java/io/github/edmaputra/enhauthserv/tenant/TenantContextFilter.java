@@ -1,58 +1,100 @@
 package io.github.edmaputra.enhauthserv.tenant;
 
+import io.github.edmaputra.enhauthserv.application.usecase.tenant.ResolveTenantUseCase;
+import io.github.edmaputra.enhauthserv.application.usecase.tenant.TenantResolutionPolicy;
+import io.github.edmaputra.enhauthserv.application.usecase.tenant.TenantResolutionResult;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 public class TenantContextFilter extends OncePerRequestFilter {
 
-  private static final Pattern TENANT_PATH_PATTERN = Pattern.compile("^/t/([A-Za-z0-9_-]+)(/.*)?$");
-  private static final Pattern TENANT_MACHINE_ENDPOINT_PATTERN =
-      Pattern.compile("^/t/([A-Za-z0-9_-]+)/(oauth2/introspect|oauth2/revoke)$");
+  private static final Logger LOG = LoggerFactory.getLogger(TenantContextFilter.class);
+
+  private final String headerName;
+  private final ResolveTenantUseCase resolveTenantUseCase;
+
+  public TenantContextFilter(
+      @Value("${tenant.resolution.header-enabled:true}") boolean headerEnabled,
+      @Value("${tenant.resolution.path-enabled:true}") boolean pathEnabled,
+      @Value("${tenant.resolution.require-explicit-tenant:false}") boolean requireExplicitTenant,
+      @Value("${tenant.resolution.enforce-trusted-proxy-for-header:false}") boolean enforceTrustedProxyForHeader,
+      @Value("${tenant.resolution.header-name:X-Tenant-ID}") String headerName,
+      @Value("${tenant.resolution.header-trusted-sources:127.0.0.1,::1,0:0:0:0:0:0:0:1}")
+      String headerTrustedSources) {
+    this.headerName = headerName;
+    Set<String> trustedHeaderSources = Arrays.stream(headerTrustedSources.split(","))
+        .map(String::trim)
+        .filter(value -> !value.isBlank())
+        .collect(Collectors.toSet());
+    TenantResolutionPolicy policy = new TenantResolutionPolicy(
+        headerEnabled,
+        pathEnabled,
+        requireExplicitTenant,
+        enforceTrustedProxyForHeader,
+        trustedHeaderSources);
+    this.resolveTenantUseCase = new ResolveTenantUseCase(policy);
+  }
 
   @Override
   protected void doFilterInternal(
-      HttpServletRequest request,
-      HttpServletResponse response,
-      FilterChain filterChain) throws ServletException, IOException {
+      @NonNull HttpServletRequest request,
+      @NonNull HttpServletResponse response,
+      @NonNull FilterChain filterChain) throws ServletException, IOException {
     try {
       String requestUri = request.getRequestURI();
-      if (requestUri != null) {
-        Matcher machineEndpointMatcher = TENANT_MACHINE_ENDPOINT_PATTERN.matcher(requestUri);
-        if (machineEndpointMatcher.matches()) {
-          TenantContext.setCurrentTenant(machineEndpointMatcher.group(1));
-          String rewrittenPath = "/" + machineEndpointMatcher.group(2);
-          filterChain.doFilter(new MachineEndpointRewriteRequest(request, rewrittenPath), response);
-          return;
+      TenantResolutionResult resolution = resolveTenantUseCase.resolve(
+          requestUri,
+          request.getHeader(headerName),
+          request.getRemoteAddr());
+
+      if (resolution.tenantId().isPresent()) {
+        TenantContext.setCurrentTenant(resolution.tenantId().get());
+        if (resolution.tenantSource() == TenantResolutionResult.TenantSource.HEADER) {
+          LOG.debug("Tenant resolved from header '{}' as '{}'", headerName, resolution.tenantId().get());
+        } else if (resolution.tenantSource() == TenantResolutionResult.TenantSource.PATH) {
+          LOG.debug("Tenant resolved from path as '{}'", resolution.tenantId().get());
         }
+      } else if (resolution.invalidRequest()) {
+        LOG.debug("Tenant resolution failed for request URI '{}' with strict mode enabled", requestUri);
+        writeInvalidRequest(response, "Unable to resolve tenant from request");
+        return;
       }
 
-      resolveTenantFromRequestPath(request).ifPresent(TenantContext::setCurrentTenant);
+      if (resolution.rewrittenPath().isPresent()) {
+        filterChain.doFilter(
+            new MachineEndpointRewriteRequest(request, resolution.rewrittenPath().get()),
+            response);
+        return;
+      }
+
       filterChain.doFilter(request, response);
     } finally {
       TenantContext.clear();
     }
   }
 
-  private java.util.Optional<String> resolveTenantFromRequestPath(HttpServletRequest request) {
-    String requestUri = request.getRequestURI();
-    if (requestUri == null || requestUri.isBlank()) {
-      return java.util.Optional.empty();
-    }
-
-    Matcher matcher = TENANT_PATH_PATTERN.matcher(requestUri);
-    if (!matcher.matches()) {
-      return java.util.Optional.empty();
-    }
-    return java.util.Optional.ofNullable(matcher.group(1));
+  private void writeInvalidRequest(HttpServletResponse response, String description) throws IOException {
+    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+    response.getWriter()
+        .write("{\"error\":\"invalid_request\",\"error_description\":\"" + description + "\"}");
   }
 
   private static final class MachineEndpointRewriteRequest extends HttpServletRequestWrapper {

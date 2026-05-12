@@ -1,14 +1,13 @@
 package io.github.edmaputra.enhauthserv.controller;
 
-import io.github.edmaputra.enhauthserv.service.ClientAuthenticationService;
-import io.github.edmaputra.enhauthserv.service.IntrospectionAuthorizationService;
-import io.github.edmaputra.enhauthserv.service.TokenIntrospectionValidator;
+import io.github.edmaputra.enhauthserv.application.port.in.IntrospectTokenInputPort;
+import io.github.edmaputra.enhauthserv.application.usecase.introspection.IntrospectTokenCommand;
+import io.github.edmaputra.enhauthserv.application.usecase.introspection.IntrospectTokenResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,9 +27,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class OAuth2TokenIntrospectionController {
 
-    private final ClientAuthenticationService clientAuthenticationService;
-    private final TokenIntrospectionValidator tokenValidator;
-    private final IntrospectionAuthorizationService authorizationService;
+    private final IntrospectTokenInputPort introspectTokenInputPort;
 
     /**
      * RFC 7662 Token Introspection endpoint.
@@ -46,56 +43,25 @@ public class OAuth2TokenIntrospectionController {
             HttpServletRequest request) {
 
         log.debug("Received token introspection request");
+        IntrospectTokenResult result = introspectTokenInputPort.introspect(
+            new IntrospectTokenCommand(token, request.getHeader("Authorization")));
 
-        // Step 0: Verify token parameter is present
-        if (token == null || token.isEmpty()) {
+        if (result.status() == IntrospectTokenResult.Status.OK) {
+            boolean isActive = (Boolean) result.body().getOrDefault("active", false);
+            log.info("Token introspection completed - Active: {}", isActive);
+            return ResponseEntity.ok(result.body());
+        }
+
+        if (result.status() == IntrospectTokenResult.Status.BAD_REQUEST) {
             log.warn("Token introspection request without token parameter");
-            return buildErrorResponse(HttpStatus.BAD_REQUEST, "invalid_request",
-                    "Missing required parameter: token");
+            return new ResponseEntity<>(result.body(), HttpStatus.BAD_REQUEST);
         }
 
-        // Step 1: Extract and validate client credentials from Basic Auth
-        ClientAuthenticationService.AuthenticationResult clientAuthentication =
-            clientAuthenticationService.authenticateBasicClient(request);
-        if (!clientAuthentication.authenticated()) {
+        if (result.status() == IntrospectTokenResult.Status.UNAUTHORIZED) {
             log.warn("Token introspection request without valid Basic Auth credentials");
-            return buildErrorResponse(HttpStatus.UNAUTHORIZED, "invalid_client",
-                    "Client authentication failed");
+            return new ResponseEntity<>(result.body(), HttpStatus.UNAUTHORIZED);
         }
 
-        String clientId = clientAuthentication.clientId();
-        RegisteredClient registeredClient = clientAuthentication.registeredClient();
-
-        // Step 3: Check if client is authorized to introspect tokens
-        if (!authorizationService.canIntrospect(registeredClient)) {
-            log.warn("Client {} attempted introspection without required scope", clientId);
-            return buildErrorResponse(HttpStatus.FORBIDDEN, "unauthorized_client",
-                    "Client is not authorized to introspect tokens (missing scope: " + 
-                    authorizationService.getIntrospectionScope() + ")");
-        }
-
-        // Step 4: Validate the token and extract claims
-        Map<String, Object> introspectionResponse = tokenValidator.introspect(token);
-        boolean isActive = (Boolean) introspectionResponse.getOrDefault("active", false);
-
-        log.info("Token introspection completed for client: {} - Active: {}", clientId, isActive);
-
-        // Step 5: Return RFC 7662 response
-        return ResponseEntity.ok(introspectionResponse);
-    }
-
-    /**
-     * Builds an error response according to RFC 7662.
-     *
-     * @param status the HTTP status code
-     * @param error the error code
-     * @param errorDescription the error description
-     * @return ResponseEntity with error details
-     */
-    private ResponseEntity<Map<String, Object>> buildErrorResponse(HttpStatus status, String error, String errorDescription) {
-        Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("error", error);
-        errorResponse.put("error_description", errorDescription);
-        return new ResponseEntity<>(errorResponse, status);
+        return new ResponseEntity<>(result.body(), HttpStatus.FORBIDDEN);
     }
 }
