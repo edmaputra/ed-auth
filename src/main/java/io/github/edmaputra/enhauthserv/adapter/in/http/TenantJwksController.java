@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv.controller;
+package io.github.edmaputra.enhauthserv.adapter.in.http;
 
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKMatcher;

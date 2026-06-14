@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv.controller;
+package io.github.edmaputra.enhauthserv.adapter.in.http;
 
 import io.github.edmaputra.enhauthserv.tenant.TenantIssuerService;
 import java.util.LinkedHashMap;

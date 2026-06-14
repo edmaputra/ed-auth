@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv.controller;
+package io.github.edmaputra.enhauthserv.adapter.in.http;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
