@@ -3,13 +3,24 @@ package io.github.edmaputra.enhauthserv;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.github.edmaputra.enhauthserv.tenant.TenantContext;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
+import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -25,6 +36,12 @@ import org.springframework.util.MultiValueMap;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class TokenIntrospectionEndpointTests extends AuthServerIntegrationTests {
+
+    @Autowired
+    private RegisteredClientRepository registeredClientRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     /**
      * Test 1: Valid access token should return active=true with all RFC 7662 fields
@@ -112,6 +129,7 @@ class TokenIntrospectionEndpointTests extends AuthServerIntegrationTests {
         // If the controller is reached, it will return JSON error with 401
         // Either way, the request is rejected
         String responseBody = response.getBody();
+        assertThat(responseBody).isNotNull();
         boolean isHtmlResponse = responseBody.contains("<!DOCTYPE") || responseBody.contains("<html");
         boolean isJsonError = responseBody.contains("\"error\"") || responseBody.contains("'error'");
 
@@ -328,6 +346,120 @@ class TokenIntrospectionEndpointTests extends AuthServerIntegrationTests {
         assertThat(body.path("scope").asText()).contains("read");
     }
 
+    @Test
+    void tenantPathIntrospectionWithTenantClientReturnsInactiveForOtherTenantToken() throws Exception {
+        ensureTenantClient("tenant-b", "tenant-b-introspect-client", "tenant-b-secret", Set.of("introspection", "read"));
+        String demoAccessToken = getAccessToken("demo-client", "demo-secret");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setBasicAuth("tenant-b-introspect-client", "tenant-b-secret");
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("token", demoAccessToken);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/t/{tenant}/oauth2/introspect",
+            new HttpEntity<>(form, headers),
+            String.class,
+            "tenant-b");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertThat(body.path("active").asBoolean()).isFalse();
+    }
+
+    @Test
+    void tenantPathIntrospectionWithMatchingTenantClientDoesNotRedirectToLogin() throws Exception {
+        String demoAccessToken = getAccessToken("demo-client", "demo-secret");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setBasicAuth("demo-client", "demo-secret");
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("token", demoAccessToken);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/t/{tenant}/oauth2/introspect",
+            new HttpEntity<>(form, headers),
+            String.class,
+            "demo");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertThat(body.path("active").asBoolean()).isTrue();
+    }
+
+    @Test
+    void headerTenantIntrospectionWithMatchingTenantClientReturnsActive() throws Exception {
+        String demoAccessToken = getAccessToken("demo-client", "demo-secret");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setBasicAuth("demo-client", "demo-secret");
+        headers.set("X-Tenant-ID", "demo");
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("token", demoAccessToken);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/oauth2/introspect",
+            new HttpEntity<>(form, headers),
+            String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertThat(body.path("active").asBoolean()).isTrue();
+    }
+
+    @Test
+    void headerTenantIntrospectionWithDifferentTenantReturnsInactive() throws Exception {
+        ensureTenantClient("tenant-b", "tenant-b-introspect-client", "tenant-b-secret", Set.of("introspection", "read"));
+        String demoAccessToken = getAccessToken("demo-client", "demo-secret");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setBasicAuth("tenant-b-introspect-client", "tenant-b-secret");
+        headers.set("X-Tenant-ID", "tenant-b");
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("token", demoAccessToken);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/oauth2/introspect",
+            new HttpEntity<>(form, headers),
+            String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertThat(body.path("active").asBoolean()).isFalse();
+    }
+
+    @Test
+    void headerTenantIntrospectionOverridesPathTenantWhenBothArePresent() throws Exception {
+        ensureTenantClient("tenant-b", "tenant-b-introspect-client", "tenant-b-secret", Set.of("introspection", "read"));
+        String demoAccessToken = getAccessToken("demo-client", "demo-secret");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setBasicAuth("tenant-b-introspect-client", "tenant-b-secret");
+        headers.set("X-Tenant-ID", "tenant-b");
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("token", demoAccessToken);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/t/{tenant}/oauth2/introspect",
+            new HttpEntity<>(form, headers),
+            String.class,
+            "demo");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertThat(body.path("active").asBoolean()).isFalse();
+    }
+
     // ==================== Helper Methods ====================
 
     /**
@@ -385,5 +517,35 @@ class TokenIntrospectionEndpointTests extends AuthServerIntegrationTests {
 
         JsonNode body = objectMapper.readTree(response.getBody());
         return body.path("access_token").asText();
+    }
+
+    private void ensureTenantClient(
+        String tenant,
+        String clientId,
+        String clientSecret,
+        Set<String> scopes) {
+        TenantContext.setCurrentTenant(tenant);
+        try {
+            if (registeredClientRepository.findByClientId(clientId) != null) {
+                return;
+            }
+
+            RegisteredClient.Builder builder = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId(clientId)
+                .clientSecret(passwordEncoder.encode(clientSecret))
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .clientSettings(ClientSettings.builder().build())
+                .tokenSettings(TokenSettings.builder().build());
+
+            for (String scope : scopes) {
+                builder.scope(scope);
+            }
+
+            registeredClientRepository.save(builder.build());
+        } finally {
+            TenantContext.clear();
+        }
     }
 }

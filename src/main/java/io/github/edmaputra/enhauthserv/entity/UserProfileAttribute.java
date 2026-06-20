@@ -28,6 +28,9 @@ public class UserProfileAttribute {
   @JoinColumn(name = "username", nullable = false)
   private UserProfile userProfile;
 
+  @Column(name = "tenant_id", nullable = false, length = 100)
+  private String tenantId;
+
   @Column(name = "attribute_key", nullable = false, length = 120)
   private String attributeKey;
 
@@ -39,6 +42,7 @@ public class UserProfileAttribute {
       String attributeKey,
       String attributeValue) {
     this.userProfile = userProfile;
+    this.tenantId = userProfile.getTenant();
     this.attributeKey = attributeKey;
     this.attributeValue = attributeValue;
   }

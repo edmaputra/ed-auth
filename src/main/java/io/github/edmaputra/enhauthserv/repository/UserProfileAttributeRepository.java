@@ -10,5 +10,12 @@ public interface UserProfileAttributeRepository extends JpaRepository<UserProfil
 
   List<UserProfileAttribute> findByUserProfileUsername(String username);
 
+  List<UserProfileAttribute> findByTenantIdAndUserProfileUsername(String tenantId, String username);
+
   boolean existsByUserProfileUsernameAndAttributeKey(String username, String attributeKey);
+
+  boolean existsByTenantIdAndUserProfileUsernameAndAttributeKey(
+      String tenantId,
+      String username,
+      String attributeKey);
 }

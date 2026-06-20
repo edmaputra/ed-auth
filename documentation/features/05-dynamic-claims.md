@@ -1,0 +1,94 @@
+# Feature 5 — Dynamic Claims
+
+Beyond the fixed profile fields, EnhAuthServ lets you attach arbitrary key/value attributes to a user and route each one to the UserInfo response, the ID token, the access token, or any combination — driven by data, not code.
+
+## Data model
+
+| Entity | Table | Role |
+|---|---|---|
+| `UserProfile` | `user_profiles` | Standard profile (name, email, locale, zoneinfo, department, tenant) |
+| `UserProfileAttribute` | `user_profile_attributes` | Arbitrary `attribute_key` / `attribute_value` per user, per tenant |
+| `ClaimInclusionRule` | `claim_inclusion_rules` | Maps an `attribute_key` → set of targets |
+| `ClaimTarget` (enum) | — | `USERINFO`, `ID_TOKEN`, `ACCESS_TOKEN` |
+
+`UserProfileAttribute` has a unique constraint on `(tenant_id, username, attribute_key)`. `ClaimInclusionRule.targets` is stored as a comma-separated list of `ClaimTarget` names.
+
+## Resolution flow (`UserClaimsUseCase`)
+
+For a given username and target (`ClaimType.USERINFO` / `ID_TOKEN` / `ACCESS_TOKEN`):
+
+1. Load the user profile (or build a default).
+2. Load the user's attributes for the current tenant (via `CurrentTenantPort`).
+3. Load the `ClaimInclusionRule`s for those attribute keys, scoped to the tenant.
+4. For each attribute, include it **only if** its rule targets the requested type.
+5. Skip any attribute whose key is a **reserved claim** (`sub`, `iss`, `aud`, `exp`, `iat`, `nbf`, `jti`, `scope`, `client_id`, `azp`, `token_type`, `auth_time`, `nonce`, `at_hash`, `c_hash`, `sid`, `amr`, `acr`).
+
+The result is a `Map<String, Object>` merged into the token/userinfo output by the relevant customizer in `SecurityConfig`.
+
+## Where claims are injected
+
+| Target | Injection point |
+|---|---|
+| `USERINFO` | `userInfoMapper` bean → `/userinfo` response |
+| `ID_TOKEN` | `jwtTokenCustomizer` → ID token JWT |
+| `ACCESS_TOKEN` | `jwtTokenCustomizer` → access token JWT |
+
+## Example (seeded demo data)
+
+| Attribute | Value | Targets |
+|---|---|---|
+| `favorite_color` | `blue` | USERINFO, ACCESS_TOKEN |
+| `employee_level` | `senior` | ID_TOKEN, ACCESS_TOKEN |
+| `region` | `apac` | USERINFO, ID_TOKEN |
+
+So `region` appears in UserInfo and the ID token, but never in the access token.
+
+## Implementation
+
+| Concern | Class / file |
+|---|---|
+| Input port | [`application/port/in/UserClaimsInputPort`](../../src/main/java/io/github/edmaputra/enhauthserv/application/port/in/UserClaimsInputPort.java) |
+| Use case | [`application/usecase/claims/UserClaimsUseCase`](../../src/main/java/io/github/edmaputra/enhauthserv/application/usecase/claims/UserClaimsUseCase.java) (+ `ClaimType`, `UserAttributeData`, `UserProfileData`) |
+| Data output port | `application/port/out/UserClaimsDataPort` |
+| Data adapter | [`adapter/out/persistence/UserClaimsRepositoryAdapter`](../../src/main/java/io/github/edmaputra/enhauthserv/adapter/out/persistence/UserClaimsRepositoryAdapter.java) |
+| Tenant resolution | `CurrentTenantPort` → `adapter/out/tenant/TenantContextAdapter` |
+| Entities | `entity/UserProfile`, `entity/UserProfileAttribute`, `entity/ClaimInclusionRule`, `entity/ClaimTarget` |
+| Repositories | `repository/UserProfileRepository`, `UserProfileAttributeRepository`, `ClaimInclusionRuleRepository` |
+| Injection points | `SecurityConfig.userInfoMapper(...)`, `SecurityConfig.jwtTokenCustomizer(...)` |
+| Seeding | `SecurityConfig` demo seeders (`demoUserProfileSeeder`, `demoUserProfileAttributeSeeder`, `demoClaimInclusionRuleSeeder`) |
+
+Notes from the code:
+
+- `UserClaimsUseCase.getClaims` resolves the tenant via `CurrentTenantPort.currentTenantOrDefault("demo")`, loads attributes, then asks `findIncludedAttributeKeys(tenant, keys, claimType)` for the subset whose rule targets the requested `ClaimType`.
+- Each attribute is dropped if its key is blank, in `RESERVED_CLAIMS`, or not in the included set.
+- `getOrDefaultProfile` falls back to a synthetic `UserProfileData` (`username@example.com`, `en-US`, `UTC`, …) when no profile row exists.
+
+## Claims assembly — sequence
+
+```mermaid
+sequenceDiagram
+    participant Caller as userInfoMapper / jwtTokenCustomizer
+    participant UC as UserClaimsUseCase
+    participant T as CurrentTenantPort
+    participant D as UserClaimsRepositoryAdapter
+    participant DB as attributes + claim_inclusion_rules
+
+    Caller->>UC: getClaims(username, claimType)
+    UC->>T: currentTenantOrDefault("demo")
+    T-->>UC: tenantId
+    UC->>D: findUserAttributes(tenantId, username)
+    D->>DB: query attributes
+    DB-->>D: rows
+    D-->>UC: attributes
+    UC->>D: findIncludedAttributeKeys(tenantId, keys, claimType)
+    D->>DB: query rules for claimType
+    DB-->>D: included keys
+    D-->>UC: included set
+    UC->>UC: drop reserved / not-included keys
+    UC-->>Caller: filtered claims map
+```
+
+## Related tests
+
+- `UserClaimsUseCaseTests` — filtering by `ClaimType`, reserved-claim exclusion.
+- `OidcUserInfoEndpointTests` — end-to-end UserInfo claims.
