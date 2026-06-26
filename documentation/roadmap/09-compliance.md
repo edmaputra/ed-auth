@@ -33,7 +33,7 @@ An IdP is a custodian of personal data and must support regulatory and governanc
 - Tamper-evident audit export for compliance attestation.
 
 ## Fit
-A `ConsentLedgerPort` and `DataSubjectRequestUseCase`; retention jobs; encryption at the persistence adapter layer. Tenant isolation already in place supports data-residency boundaries.
+A `ConsentLedgerService` (extending the `consent` slice) and a `DataSubjectRequestService`; retention jobs; encryption at the persistence layer. Tenant isolation already in place supports data-residency boundaries.
 
 ## Why it matters
 Handling real user identities triggers legal obligations. Consent ledgers, erasure, and audit evidence are prerequisites for operating in regulated markets.

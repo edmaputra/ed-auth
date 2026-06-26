@@ -59,31 +59,31 @@ token=eyJraWQ...
 | `401 Unauthorized` | `invalid_client` | Client authentication failed |
 | `403 Forbidden` | `unauthorized_client` | Client lacks the `introspection` scope |
 
-## Flow (`IntrospectTokenUseCase`)
+## Flow (`IntrospectTokenService`)
 
 1. Validate that `token` is present → otherwise `400 invalid_request`.
 2. Authenticate the calling client via HTTP Basic (`clients/ClientAuthenticationService`) → otherwise `401`.
-3. Confirm the client holds the `introspection` scope (`application/usecase/authorization/AuthorizationPolicyUseCase` + `clients/ClientScopeService`) → otherwise `403 unauthorized_client`.
-4. Delegate to `TokenIntrospectionPort` → `TokenIntrospectionValidator` for the actual RFC 7662 evaluation.
+3. Confirm the client holds the `introspection` scope (`authorization/AuthorizationPolicyService` + `clients/ClientScopeService`) → otherwise `403 unauthorized_client`.
+4. Delegate to `tokens/introspection/TokenIntrospectionValidator` for the actual RFC 7662 evaluation.
 
 ## Why a custom endpoint
 
-Custom introspection/revocation use cases run as `permitAll` chains; client authentication and scope checks are handled inside the use case rather than by Spring's default chain. This keeps tenant path rewriting and the `introspection`-scope gate consistent across tenant and non-tenant paths.
+Custom introspection/revocation services run as `permitAll` chains; client authentication and scope checks are handled inside the service rather than by Spring's default chain. This keeps tenant path rewriting and the `introspection`-scope gate consistent across tenant and non-tenant paths.
 
 ## Implementation
 
 | Concern | Class / file |
 |---|---|
-| Controller | [`adapter/in/http/OAuth2TokenIntrospectionController`](../../src/main/java/io/github/edmaputra/enhauthserv/adapter/in/http/OAuth2TokenIntrospectionController.java) |
-| Use case | [`application/usecase/introspection/IntrospectTokenUseCase`](../../src/main/java/io/github/edmaputra/enhauthserv/application/usecase/introspection/IntrospectTokenUseCase.java) (+ `IntrospectTokenCommand`, `IntrospectTokenResult`) |
+| Controller | [`tokens/introspection/OAuth2TokenIntrospectionController`](../../src/main/java/io/github/edmaputra/enhauthserv/tokens/introspection/OAuth2TokenIntrospectionController.java) |
+| Service | [`tokens/introspection/IntrospectTokenService`](../../src/main/java/io/github/edmaputra/enhauthserv/tokens/introspection/IntrospectTokenService.java) (+ `IntrospectTokenCommand`, `IntrospectTokenResult`) |
 | Client auth | `clients/ClientAuthenticationService` |
-| Scope policy | `application/usecase/authorization/AuthorizationPolicyUseCase` + `clients/ClientScopeService` |
-| Token check | `service/TokenIntrospectionValidator` |
+| Scope policy | `authorization/AuthorizationPolicyService` + `clients/ClientScopeService` |
+| Token check | `tokens/introspection/TokenIntrospectionValidator` |
 | Filter chains | `oauth/SecurityConfig` `@Order(1)` (tenant path, permitAll) and `@Order(3)` (base path, permitAll) |
 
 Notes from the code:
 
-- The endpoint is `permitAll` at the chain level; **client authentication and the `introspection`-scope gate happen inside the use case**, not in Spring Security.
+- The endpoint is `permitAll` at the chain level; **client authentication and the `introspection`-scope gate happen inside the service**, not in Spring Security.
 - `TokenIntrospectionValidator` first checks the token is active in `OAuth2AuthorizationService`, then decodes the JWT; any `JwtException` yields `{"active": false}`.
 
 ## Introspection — sequence
@@ -92,10 +92,9 @@ Notes from the code:
 sequenceDiagram
     participant RS as Resource server
     participant Ctrl as OAuth2TokenIntrospectionController
-    participant UC as IntrospectTokenUseCase
+    participant UC as IntrospectTokenService
     participant Auth as ClientAuthenticationService
-    participant Pol as AuthorizationPolicyUseCase
-    participant Tok as TokenIntrospectionPort
+    participant Pol as AuthorizationPolicyService
     participant V as TokenIntrospectionValidator
 
     RS->>Ctrl: POST /oauth2/introspect (Basic auth, token)
@@ -113,14 +112,12 @@ sequenceDiagram
         Pol-->>UC: unauthorized
         UC-->>Ctrl: 403 unauthorized_client
     end
-    UC->>Tok: introspect(token)
-    Tok->>V: introspect(token)
-    V-->>Tok: RFC 7662 map (active true/false)
-    Tok-->>UC: map
+    UC->>V: introspect(token)
+    V-->>UC: RFC 7662 map (active true/false)
     UC-->>Ctrl: 200 result
     Ctrl-->>RS: JSON
 ```
 
 ## Related tests
 
-- `TokenIntrospectionEndpointTests`, `IntrospectTokenUseCaseTests`, `AuthorizationPolicyUseCaseTests`
+- `TokenIntrospectionEndpointTests`, `IntrospectTokenServiceTests`, `AuthorizationPolicyUseCaseTests`

@@ -58,7 +58,7 @@ Migration `V0_0_1_007` adds a `tenant_id` discriminator (default `demo`) to `oau
 | Request filter | [`tenancy/TenantContextFilter`](../../src/main/java/io/github/edmaputra/enhauthserv/tenancy/TenantContextFilter.java) |
 | Resolution logic | [`tenancy/ResolveTenantService`](../../src/main/java/io/github/edmaputra/enhauthserv/tenancy/ResolveTenantService.java) + `TenantResolutionPolicy`, `TenantResolutionResult` |
 | Thread-local | [`tenancy/TenantContext`](../../src/main/java/io/github/edmaputra/enhauthserv/tenancy/TenantContext.java) |
-| Use-case access | `UserClaimsUseCase` reads `TenantContext` directly |
+| Service access | `claims/UserClaimsService` reads `TenantContext` directly |
 | Tenant-aware stores | `oauth/TenantAwareRegisteredClientRepository`, `TenantAwareOAuth2AuthorizationService`, `TenantAwareOAuth2AuthorizationConsentService` |
 | Issuer | `tenancy/TenantIssuerService` |
 

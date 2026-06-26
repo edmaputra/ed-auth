@@ -26,7 +26,7 @@ A complete IdP acts as a broker: users authenticate against external providers, 
 - Just-in-time user creation on first federated login.
 
 ## Fit
-A `FederationUseCase` with an `IdentityProviderPort` abstraction (one adapter per protocol); per-tenant IdP configuration persisted as new entities; reuse the existing dynamic-claims pipeline for attribute mapping.
+A new `federation` slice with a `FederationService` and an identity-provider connector abstraction (one implementation per protocol); per-tenant IdP configuration persisted as new entities; reuse the existing `claims` slice for attribute mapping.
 
 ## Why it matters
 Enterprises require "log in with our existing IdP." Brokering + JIT provisioning is the difference between a standalone IdP and one that integrates into existing identity ecosystems.

@@ -13,7 +13,7 @@ Beyond the fixed profile fields, EnhAuthServ lets you attach arbitrary key/value
 
 `UserProfileAttribute` has a unique constraint on `(tenant_id, username, attribute_key)`. `ClaimInclusionRule.targets` is stored as a comma-separated list of `ClaimTarget` names.
 
-## Resolution flow (`UserClaimsUseCase`)
+## Resolution flow (`UserClaimsService`)
 
 For a given username and target (`ClaimType.USERINFO` / `ID_TOKEN` / `ACCESS_TOKEN`):
 
@@ -48,8 +48,7 @@ So `region` appears in UserInfo and the ID token, but never in the access token.
 | Concern | Class / file |
 |---|---|
 | Claim service | [`claims/UserClaimsService`](../../src/main/java/io/github/edmaputra/enhauthserv/claims/UserClaimsService.java) (+ `ClaimType`, `UserAttributeData`, `UserProfileData`) |
-| Claim data port | `claims/UserClaimsDataProvider` |
-| Claim data adapter | `claims/UserClaimsRepositoryAdapter` |
+| Claim data access | `claims/UserClaimsDataProvider` (`@Component` aggregating `users/UserProfileRepository`, `users/UserProfileAttributeRepository`, `claims/ClaimInclusionRuleRepository`) |
 | Tenant resolution | `tenancy/TenantContext` |
 | Feature models | `users/UserProfile`, `users/UserProfileAttribute`, `claims/ClaimInclusionRule`, `claims/ClaimTarget` |
 | Feature repositories | `users/UserProfileRepository`, `users/UserProfileAttributeRepository`, `claims/ClaimInclusionRuleRepository` |
@@ -67,9 +66,9 @@ Notes from the code:
 ```mermaid
 sequenceDiagram
     participant Caller as userInfoMapper / jwtTokenCustomizer
-    participant UC as UserClaimsUseCase
+    participant UC as UserClaimsService
     participant T as TenantContext
-    participant D as claims/UserClaimsRepositoryAdapter
+    participant D as claims/UserClaimsDataProvider
     participant DB as user profile + claim rule tables
 
     Caller->>UC: getClaims(username, claimType)

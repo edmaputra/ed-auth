@@ -95,4 +95,4 @@ erDiagram
     }
 ```
 
-> The link between attributes and rules is **by `attribute_key` (within a tenant)**, not a database foreign key — it is resolved in code by `UserClaimsService`/`UserClaimsRepositoryAdapter`.
+> The link between attributes and rules is **by `attribute_key` (within a tenant)**, not a database foreign key — it is resolved in code by `claims/UserClaimsService` via `claims/UserClaimsDataProvider`.

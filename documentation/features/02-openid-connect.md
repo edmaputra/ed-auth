@@ -109,7 +109,7 @@ Backed by the `UserProfile` entity: `full_name`, `email`, `email_verified`, `loc
 | Per-tenant issuer | [`tenancy/TenantIssuerService`](../../src/main/java/io/github/edmaputra/enhauthserv/tenancy/TenantIssuerService.java) |
 | UserInfo mapping | `oauth/SecurityConfig.userInfoMapper(...)` bean (wired into the `@Order(2)` chain's `oidc().userInfoEndpoint()`) |
 | ID-token claims | `oauth/SecurityConfig.jwtTokenCustomizer(...)` (branch on `OidcParameterNames.ID_TOKEN`) |
-| Claim assembly | [`application/usecase/claims/UserClaimsUseCase`](05-dynamic-claims.md) |
+| Claim assembly | [`claims/UserClaimsService`](05-dynamic-claims.md) |
 
 Notes from the code:
 
@@ -123,8 +123,8 @@ sequenceDiagram
     participant RP as Client (Bearer token)
     participant UI as SAS UserInfo endpoint
     participant Map as userInfoMapper (SecurityConfig)
-    participant UC as UserClaimsUseCase
-    participant Data as UserClaimsRepositoryAdapter
+    participant UC as UserClaimsService
+    participant Data as UserClaimsDataProvider
     participant DB as profile / attribute / rule tables
 
     RP->>UI: GET /userinfo (Authorization: Bearer)

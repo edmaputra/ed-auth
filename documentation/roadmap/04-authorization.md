@@ -29,7 +29,7 @@ Authorization today is limited to OAuth2 **scopes** and a single `ROLE_USER`. A 
 - Admin UI/API to manage roles, permissions, and policies per tenant.
 
 ## Fit
-An `AuthorizationDecisionPort` consulted during token customization and exposed as a decision endpoint; role/permission entities; a policy engine adapter. Claims continue to flow through `UserClaimsUseCase`.
+An `AuthorizationDecisionService` in the `authorization` slice consulted during token customization and exposed as a decision endpoint; role/permission entities; a pluggable policy-engine component. Claims continue to flow through `claims/UserClaimsService`.
 
 ## Why it matters
 Scopes alone can't express organizational access rules. RBAC/ABAC/ReBAC let the IdP be the authoritative source for *what a subject may do*, not just *who they are*.
