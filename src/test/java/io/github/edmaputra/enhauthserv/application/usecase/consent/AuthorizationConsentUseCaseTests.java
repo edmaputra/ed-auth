@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.edmaputra.enhauthserv.consent.AuthorizationConsentService;
+import io.github.edmaputra.enhauthserv.consent.CheckConsentCommand;
+import io.github.edmaputra.enhauthserv.consent.ConsentDecisionResult;
 import io.github.edmaputra.enhauthserv.consent.ConsentStore;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,16 +17,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class AuthorizationConsentUseCaseTests {
+class AuthorizationConsentServiceTests {
 
   @Mock
   private ConsentStore consentStore;
 
-  private AuthorizationConsentUseCase useCase;
+  private AuthorizationConsentService useCase;
 
   @BeforeEach
   void setUp() {
-    useCase = new AuthorizationConsentUseCase(consentStore);
+    useCase = new AuthorizationConsentService(consentStore);
   }
 
   @Test

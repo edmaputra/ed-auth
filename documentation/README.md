@@ -2,26 +2,31 @@
 
 **EnhAuthServ** is a multi-tenant **Identity Provider (IdP)** built on Spring Authorization Server. It issues and manages OAuth 2.0 / OpenID Connect tokens, isolates state per tenant, and supports dynamically-assembled identity claims.
 
-This documentation set describes **what the system does today** (Features) and **where it can go** (Roadmap).
+This documentation set describes **what the system does today** (Features) and **how the code is organized** (Architecture and modules).
 
 ## How this is organized
 
 | Section | Description |
 |---|---|
-| [Architecture](features/00-architecture.md) | Hexagonal layering, package map, request lifecycle |
+| [Architecture](features/00-architecture.md) | Vertical-slice module map, package boundaries, request lifecycle |
 | **Features** | One file per capability — see table below |
 | [Roadmap](roadmap/README.md) | Planned features to cover the full IdP problem space |
 
 ## Current code structure
 
-| Area | Packages |
-|---|---|
-| Application logic | `application/usecase/**` |
-| Driving adapters | `adapter/in/http/**`, `adapter/in/filter/**` |
-| Driven adapters | `adapter/out/persistence/**`, `adapter/out/security/**` |
-| Auth / OIDC wiring | `oauth/**`, `consent/**`, `clients/**`, `tokens/**`, `shared/**` |
-| Tenant support | `tenancy/**` |
-| Core domain + persistence | `domain/**`, `entity/**`, `repository/**` |
+EnhAuthServ is organized as a **Vertical-Slice Modular Monolith**. The main business capabilities are packaged as Spring Modulith application modules, with supporting technical layers kept beside them.
+
+| Concern | Packages | Notes |
+|---|---|---|
+| Vertical slices / application modules | `authorization/**`, `claims/**`, `clients/**`, `consent/**`, `tenancy/**`, `tokens/**`, `users/**` | Feature-oriented modules with explicit module boundaries |
+| OAuth / security wiring | `oauth/**`, `shared/**` | Spring Security configuration, metadata, and shared support |
+| Application use cases | `application/usecase/**` | Use-case classes, commands, and module-facing application logic |
+| Input adapters | `adapter/in/http/**`, `adapter/in/filter/**` | HTTP controllers and request filtering |
+| Output adapters | `adapter/out/persistence/**`, `adapter/out/security/**` | Persistence and security implementations |
+| Persistence model | `entity/**`, `repository/**` | JPA entities and Spring Data repositories, kept separate from modules |
+| Spring configuration | `config/**` | Property binding and wiring helpers |
+
+See [Architecture](features/00-architecture.md) for the full module map and dependency rules.
 
 ## Feature Index
 

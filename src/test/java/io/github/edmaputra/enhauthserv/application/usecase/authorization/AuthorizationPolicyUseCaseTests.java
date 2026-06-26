@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
+import io.github.edmaputra.enhauthserv.authorization.AuthorizationPolicyResult;
+import io.github.edmaputra.enhauthserv.authorization.AuthorizationPolicyService;
+import io.github.edmaputra.enhauthserv.authorization.ValidateScopeCommand;
 import io.github.edmaputra.enhauthserv.clients.ClientScopeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,16 +16,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 
 @ExtendWith(MockitoExtension.class)
-class AuthorizationPolicyUseCaseTests {
+class AuthorizationPolicyServiceTests {
 
   @Mock
   private ClientScopeService clientScopeService;
 
-  private AuthorizationPolicyUseCase useCase;
+  private AuthorizationPolicyService useCase;
 
   @BeforeEach
   void setUp() {
-    useCase = new AuthorizationPolicyUseCase(clientScopeService);
+    useCase = new AuthorizationPolicyService(clientScopeService);
   }
 
   @Test
