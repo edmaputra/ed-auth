@@ -42,7 +42,7 @@ token=8xLOxBtZp8...&token_type_hint=refresh_token
 
 1. Validate `token` is present → otherwise `400 invalid_request`.
 2. Authenticate the client via HTTP Basic (`clients/ClientAuthenticationService`) → otherwise `401`.
-3. Confirm the client holds the `revocation` scope (`tokens/revocation/RevocationAuthorizationService`, checking the scopes granted by `ClientAuthenticationService`) → otherwise `403 unauthorized_client`.
+3. Confirm the client holds the `revocation` scope (`tokens/revocation/RevocationAuthorizationService`, checking the scopes granted by `ClientAuthenticationService`) → otherwise `403 invalid_scope`.
 4. Delegate to `tokens/revocation/TokenRevoker`, which invalidates the token for the authenticated client via the tenant-aware `OAuth2AuthorizationService`.
 
 A client may only revoke tokens it owns; revocation is scoped to the authenticated `registeredClientId`.
