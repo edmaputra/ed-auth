@@ -1,12 +1,12 @@
 package io.github.edmaputra.enhauthserv.oauth;
 
 import io.github.edmaputra.enhauthserv.tokens.TokenPolicyProperties;
-import io.github.edmaputra.enhauthserv.entity.ClaimInclusionRule;
-import io.github.edmaputra.enhauthserv.entity.ClaimTarget;
-import io.github.edmaputra.enhauthserv.application.usecase.claims.UserClaimsUseCase;
-import io.github.edmaputra.enhauthserv.application.usecase.claims.ClaimType;
-import io.github.edmaputra.enhauthserv.application.usecase.claims.UserProfileData;
-import io.github.edmaputra.enhauthserv.repository.ClaimInclusionRuleRepository;
+import io.github.edmaputra.enhauthserv.claims.ClaimInclusionRule;
+import io.github.edmaputra.enhauthserv.claims.ClaimTarget;
+import io.github.edmaputra.enhauthserv.claims.UserClaimsService;
+import io.github.edmaputra.enhauthserv.claims.ClaimType;
+import io.github.edmaputra.enhauthserv.claims.UserProfileData;
+import io.github.edmaputra.enhauthserv.claims.ClaimInclusionRuleRepository;
 import io.github.edmaputra.enhauthserv.tenancy.TenantContextFilter;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -229,7 +229,7 @@ public class SecurityConfig {
 
   @Bean
   Function<OidcUserInfoAuthenticationContext, OidcUserInfo> userInfoMapper(
-      UserClaimsUseCase userClaimsUseCase) {
+      UserClaimsService userClaimsService) {
     return (context) -> {
       var authorization = context.getAuthorization();
       if (authorization == null) {
@@ -237,7 +237,7 @@ public class SecurityConfig {
       }
 
       String username = authorization.getPrincipalName();
-      UserProfileData userProfile = userClaimsUseCase.getOrDefaultProfile(username);
+      UserProfileData userProfile = userClaimsService.getOrDefaultProfile(username);
 
       Map<String, Object> claims = new LinkedHashMap<>();
       claims.put("sub", username);
@@ -250,7 +250,7 @@ public class SecurityConfig {
       claims.put("updated_at", userProfile.updatedAt());
       claims.put("department", userProfile.department());
       claims.put("tenant", userProfile.tenant());
-      claims.putAll(userClaimsUseCase.getClaims(username, ClaimType.USERINFO));
+      claims.putAll(userClaimsService.getClaims(username, ClaimType.USERINFO));
 
       return new OidcUserInfo(claims);
     };
@@ -258,7 +258,7 @@ public class SecurityConfig {
 
   @Bean
   OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
-      UserClaimsUseCase userClaimsUseCase,
+      UserClaimsService userClaimsService,
       TokenPolicyProperties tokenPolicyProperties) {
     return (context) -> {
       if (AuthorizationGrantType.CLIENT_CREDENTIALS.equals(context.getAuthorizationGrantType())) {
@@ -280,13 +280,13 @@ public class SecurityConfig {
 
       if (OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue())) {
         context.getClaims().claims((claims) ->
-            claims.putAll(userClaimsUseCase.getClaims(username, ClaimType.ID_TOKEN)));
+            claims.putAll(userClaimsService.getClaims(username, ClaimType.ID_TOKEN)));
         return;
       }
 
       if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
         context.getClaims().claims((claims) ->
-            claims.putAll(userClaimsUseCase.getClaims(username, ClaimType.ACCESS_TOKEN)));
+            claims.putAll(userClaimsService.getClaims(username, ClaimType.ACCESS_TOKEN)));
       }
     };
   }

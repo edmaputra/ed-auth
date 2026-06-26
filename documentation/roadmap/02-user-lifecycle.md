@@ -34,7 +34,7 @@ Users are currently seeded in code. A complete IdP owns the full user lifecycle 
 - Transactional email/SMS abstraction (verification, reset, security alerts).
 
 ## Fit
-New `entity`/`repository` for lifecycle state and verification tokens; `UserManagementUseCase` + admin controllers; a notification output port with pluggable providers (SMTP, SES, Twilio). All remain tenant-scoped via `tenancy/TenantContext`.
+Extend the `users` slice with new entities/repositories for lifecycle state and verification tokens, a `UserManagementService`, and admin controllers; add a notification component with pluggable providers (SMTP, SES, Twilio). All remain tenant-scoped via `tenancy/TenantContext`.
 
 ## Why it matters
 Self-service registration, recovery, and SCIM provisioning are what turn a token server into a usable identity platform and eliminate manual user administration.

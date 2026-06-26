@@ -50,7 +50,7 @@ Location: /oauth2/authorize?client_id=demo-client&response_type=code
           &redirect_uri=...&scope=openid+profile&state=xyz&consent_approved=true
 ```
 
-## Flow (`AuthorizationConsentUseCase`)
+## Flow (`AuthorizationConsentService`)
 
 - `checkConsent(command)` → `ConsentDecisionResult`: determines whether the user (`principalName`) has already authorized the client for all requested scopes, via `ConsentStore`.
 - `approveConsent(command)`: persists the approved scopes.
@@ -62,7 +62,7 @@ Consent records are stored in `oauth2_authorization_consent` and, like all OAuth
 | Concern | Class / file |
 |---|---|
 | Controller | [`consent/OAuth2AuthorizationConsentController`](../../src/main/java/io/github/edmaputra/enhauthserv/consent/OAuth2AuthorizationConsentController.java) |
-| Use case | [`application/usecase/consent/AuthorizationConsentUseCase`](../../src/main/java/io/github/edmaputra/enhauthserv/application/usecase/consent/AuthorizationConsentUseCase.java) (+ `CheckConsentCommand`, `ConsentDecisionResult`) |
+| Service | [`consent/AuthorizationConsentService`](../../src/main/java/io/github/edmaputra/enhauthserv/consent/AuthorizationConsentService.java) (+ `CheckConsentCommand`, `ConsentDecisionResult`) |
 | Storage | `consent/ConsentStore` |
 | Consent store | `oauth/TenantAwareOAuth2AuthorizationConsentService` (tenant-scoped) |
 | Client lookup | `RegisteredClientRepository` (for client name on the form) |
@@ -81,7 +81,7 @@ Notes from the code:
 sequenceDiagram
     participant UA as User-Agent
     participant Ctrl as OAuth2AuthorizationConsentController
-    participant UC as AuthorizationConsentUseCase
+    participant UC as AuthorizationConsentService
     participant CS as ConsentStore
     participant Store as TenantAwareOAuth2AuthorizationConsentService
 

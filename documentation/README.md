@@ -2,26 +2,33 @@
 
 **EnhAuthServ** is a multi-tenant **Identity Provider (IdP)** built on Spring Authorization Server. It issues and manages OAuth 2.0 / OpenID Connect tokens, isolates state per tenant, and supports dynamically-assembled identity claims.
 
-This documentation set describes **what the system does today** (Features) and **where it can go** (Roadmap).
+This documentation set describes **what the system does today** (Features) and **how the code is organized** (Architecture and modules).
 
 ## How this is organized
 
 | Section | Description |
 |---|---|
-| [Architecture](features/00-architecture.md) | Hexagonal layering, package map, request lifecycle |
+| [Architecture](features/00-architecture.md) | Module map, package boundaries, request lifecycle |
 | **Features** | One file per capability — see table below |
 | [Roadmap](roadmap/README.md) | Planned features to cover the full IdP problem space |
 
 ## Current code structure
 
-| Area | Packages |
-|---|---|
-| Application logic | `application/usecase/**` |
-| Driving adapters | `adapter/in/http/**`, `adapter/in/filter/**` |
-| Driven adapters | `adapter/out/persistence/**`, `adapter/out/security/**` |
-| Auth / OIDC wiring | `oauth/**`, `consent/**`, `clients/**`, `tokens/**`, `shared/**` |
-| Tenant support | `tenancy/**` |
-| Core domain + persistence | `domain/**`, `entity/**`, `repository/**` |
+EnhAuthServ is organized as a **Vertical-Slice Modular Monolith**. Packages are grouped by the feature they implement, and supporting packages stay close to the feature they serve.
+
+| Feature area | Packages | What belongs here |
+|---|---|---|
+| Authorization server flow | `authorization/**` | Authorization policy, authorization-code flow, PKCE-related checks, and authorization decisions |
+| OpenID Connect claims | `claims/**` | User claim assembly, claim filtering, and UserInfo claim data |
+| Client management | `clients/**` | Client bootstrap, client authentication, and client scope rules |
+| Consent | `consent/**` | Consent checks, consent storage, and consent approval flow |
+| Tenant resolution | `tenancy/**` | Tenant context, tenant resolution, tenant issuer, and tenant request filtering |
+| Token handling | `tokens/**` | Token policy, token introspection, token revocation, and token lifecycle rules |
+| User profiles | `users/**` | User profile and attribute data used by claims and identity flows |
+| OIDC / security wiring | `oauth/**` | OIDC metadata, JWKs, and Spring Security wiring for auth-server endpoints |
+| Shared support | `shared/**` | Cross-cutting helpers used by multiple feature areas, such as logout support |
+
+See [Architecture](features/00-architecture.md) for the full module map and dependency rules.
 
 ## Feature Index
 

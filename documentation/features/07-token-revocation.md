@@ -36,13 +36,13 @@ token=8xLOxBtZp8...&token_type_hint=refresh_token
 |---|---|---|
 | `400 Bad Request` | `invalid_request` | Missing `token` parameter |
 | `401 Unauthorized` | `invalid_client` | Client authentication failed |
-| `403 Forbidden` | `unauthorized_client` | Client lacks the `revocation` scope |
+| `403 Forbidden` | `invalid_scope` | Client lacks the `revocation` scope |
 
-## Flow (`RevokeTokenUseCase`)
+## Flow (`RevokeTokenService`)
 
 1. Validate `token` is present → otherwise `400 invalid_request`.
 2. Authenticate the client via HTTP Basic (`clients/ClientAuthenticationService`) → otherwise `401`.
-3. Confirm the client holds the `revocation` scope (`application/usecase/authorization/AuthorizationPolicyUseCase` + `clients/ClientScopeService`) → otherwise `403 unauthorized_client`.
+3. Confirm the client holds the `revocation` scope (`tokens/revocation/RevocationAuthorizationService`, checking the scopes granted by `ClientAuthenticationService`) → otherwise `403 invalid_scope`.
 4. Delegate to `tokens/revocation/TokenRevoker`, which invalidates the token for the authenticated client via the tenant-aware `OAuth2AuthorizationService`.
 
 A client may only revoke tokens it owns; revocation is scoped to the authenticated `registeredClientId`.
@@ -51,16 +51,16 @@ A client may only revoke tokens it owns; revocation is scoped to the authenticat
 
 | Concern | Class / file |
 |---|---|
-| Controller | [`adapter/in/http/OAuth2TokenRevocationController`](../../src/main/java/io/github/edmaputra/enhauthserv/adapter/in/http/OAuth2TokenRevocationController.java) |
-| Use case | [`application/usecase/revocation/RevokeTokenUseCase`](../../src/main/java/io/github/edmaputra/enhauthserv/application/usecase/revocation/RevokeTokenUseCase.java) (+ `RevokeTokenCommand`, `RevokeTokenResult`) |
+| Controller | [`tokens/revocation/OAuth2TokenRevocationController`](../../src/main/java/io/github/edmaputra/enhauthserv/tokens/revocation/OAuth2TokenRevocationController.java) |
+| Service | [`tokens/revocation/RevokeTokenService`](../../src/main/java/io/github/edmaputra/enhauthserv/tokens/revocation/RevokeTokenService.java) (+ `RevokeTokenCommand`, `RevokeTokenResult`) |
 | Client auth | `clients/ClientAuthenticationService` |
-| Scope policy | `application/usecase/authorization/AuthorizationPolicyUseCase` + `clients/ClientScopeService` |
+| Scope policy | `tokens/revocation/RevocationAuthorizationService` |
 | Revocation | `tokens/revocation/TokenRevoker` |
 | Filter chains | `oauth/SecurityConfig` `@Order(1)` (tenant path) and `@Order(3)` (base path), both permitAll |
 
 Notes from the code:
 
-- Same `permitAll` + in-use-case auth pattern as introspection; the scope gate here is the `revocation` scope.
+- Same `permitAll` + in-service auth pattern as introspection; the scope gate here is the `revocation` scope.
 - Revocation is bound to the authenticated `registeredClientId`, so a client can only revoke tokens it owns. An unknown token still returns `200 OK`.
 
 ## Revocation — sequence
@@ -69,9 +69,9 @@ Notes from the code:
 sequenceDiagram
     participant Cl as Client
     participant Ctrl as OAuth2TokenRevocationController
-    participant UC as RevokeTokenUseCase
+    participant UC as RevokeTokenService
     participant Auth as ClientAuthenticationService
-    participant Pol as AuthorizationPolicyUseCase
+    participant Pol as RevocationAuthorizationService
     participant Rev as TokenRevoker
     participant Store as TenantAwareOAuth2AuthorizationService
 
@@ -84,7 +84,7 @@ sequenceDiagram
     alt not authenticated
         UC-->>Ctrl: 401 invalid_client
     end
-    UC->>Pol: validateScope(clientId, "revocation")
+    UC->>Pol: canRevoke(grantedScopes)
     alt scope missing
         UC-->>Ctrl: 403 unauthorized_client
     end
@@ -98,4 +98,4 @@ sequenceDiagram
 
 ## Related tests
 
-- `TokenRevocationEndpointTests`, `RevokeTokenUseCaseTests`
+- `TokenRevocationEndpointTests`, `RevokeTokenServiceTests`

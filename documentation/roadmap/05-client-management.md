@@ -28,7 +28,7 @@ Clients are seeded in code via `clients/ClientBootstrapService`. A complete IdP 
 - Application metadata (logo, description) shown on the consent screen.
 
 ## Fit
-Add registration/admin controllers under `adapter/in/http`; persist client policy alongside `oauth2_registered_client` (tenant-scoped).
+Add registration/admin controllers to the `clients` slice; persist client policy alongside `oauth2_registered_client` (tenant-scoped).
 
 ## Why it matters
 Manual client provisioning doesn't scale. Dynamic registration and admin APIs are required for any multi-team or multi-tenant deployment.

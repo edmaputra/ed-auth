@@ -16,11 +16,11 @@ State is persisted via Spring Data JPA and Spring Security's JDBC OAuth2 stores.
 
 ## Application tables
 
-| Table | Entity | Key |
+| Table | Feature model | Key |
 |---|---|---|
-| `user_profiles` | `UserProfile` | `username` |
-| `user_profile_attributes` | `UserProfileAttribute` | `id`; unique `(tenant_id, username, attribute_key)` |
-| `claim_inclusion_rules` | `ClaimInclusionRule` | `attribute_key` |
+| `user_profiles` | `users/UserProfile` | `username` |
+| `user_profile_attributes` | `users/UserProfileAttribute` | `id`; unique `(tenant_id, username, attribute_key)` |
+| `claim_inclusion_rules` | `claims/ClaimInclusionRule` | `attribute_key` |
 
 ## Spring-managed tables
 
@@ -30,9 +30,9 @@ State is persisted via Spring Data JPA and Spring Security's JDBC OAuth2 stores.
 
 | Repository | Notable finders |
 |---|---|
-| `UserProfileRepository` | `findByUsername`, `findByTenantAndUsername` |
-| `UserProfileAttributeRepository` | `findByTenantIdAndUserProfileUsername`, `existsByTenantIdAndUserProfileUsernameAndAttributeKey` |
-| `ClaimInclusionRuleRepository` | `findByTenantIdAndAttributeKeyIn`, `findByTenantIdAndAttributeKey` |
+| `users/UserProfileRepository` | `findByUsername`, `findByTenantAndUsername` |
+| `users/UserProfileAttributeRepository` | `findByTenantIdAndUserProfileUsername`, `existsByTenantIdAndUserProfileUsernameAndAttributeKey` |
+| `claims/ClaimInclusionRuleRepository` | `findByTenantIdAndAttributeKeyIn`, `findByTenantIdAndAttributeKey` |
 
 ## Switching databases
 
@@ -52,14 +52,14 @@ spring.datasource.driver-class-name=org.postgresql.Driver
 | Concern | Class / file |
 |---|---|
 | Migrations | `src/main/resources/db/migration/V0_0_1_00{1..7}__*.sql` |
-| JPA entities | [`entity/UserProfile`](../../src/main/java/io/github/edmaputra/enhauthserv/entity/UserProfile.java), `entity/UserProfileAttribute`, `entity/ClaimInclusionRule`, `entity/ClaimTarget` |
-| Spring Data repos | `repository/UserProfileRepository`, `repository/UserProfileAttributeRepository`, `repository/ClaimInclusionRuleRepository` |
+| Feature models | `users/UserProfile`, `users/UserProfileAttribute`, `claims/ClaimInclusionRule`, `claims/ClaimTarget` |
+| Feature repositories | `users/UserProfileRepository`, `users/UserProfileAttributeRepository`, `claims/ClaimInclusionRuleRepository` |
 | OAuth2 JDBC stores | `oauth/TenantAware*` (extend Spring's `Jdbc*` stores) |
 | Datasource/Flyway config | `src/main/resources/application.properties` |
 
 Notes from the code:
 
-- The application entities (`user_profiles`, `user_profile_attributes`, `claim_inclusion_rules`) are managed by **JPA**; the OAuth2 protocol tables are managed by Spring Security's **JDBC** stores (tenant-aware subclasses).
+- The application data tables (`user_profiles`, `user_profile_attributes`, `claim_inclusion_rules`) are managed by **JPA**; the OAuth2 protocol tables are managed by Spring Security's **JDBC** stores (tenant-aware subclasses).
 - `ClaimInclusionRule.targets` is a single comma-separated column; `addTarget`/`includesTarget` maintain it.
 - `UserProfile` ↔ `UserProfileAttribute` is a `@OneToMany` (cascade delete, lazy).
 
@@ -95,4 +95,4 @@ erDiagram
     }
 ```
 
-> The link between attributes and rules is **by `attribute_key` (within a tenant)**, not a database foreign key — it is resolved in code by `UserClaimsUseCase`/`UserClaimsRepositoryAdapter`.
+> The link between attributes and rules is **by `attribute_key` (within a tenant)**, not a database foreign key — it is resolved in code by `claims/UserClaimsService` via `claims/UserClaimsDataProvider`.

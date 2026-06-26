@@ -13,7 +13,7 @@ Beyond the fixed profile fields, EnhAuthServ lets you attach arbitrary key/value
 
 `UserProfileAttribute` has a unique constraint on `(tenant_id, username, attribute_key)`. `ClaimInclusionRule.targets` is stored as a comma-separated list of `ClaimTarget` names.
 
-## Resolution flow (`UserClaimsUseCase`)
+## Resolution flow (`UserClaimsService`)
 
 For a given username and target (`ClaimType.USERINFO` / `ID_TOKEN` / `ACCESS_TOKEN`):
 
@@ -47,30 +47,29 @@ So `region` appears in UserInfo and the ID token, but never in the access token.
 
 | Concern | Class / file |
 |---|---|
-| Use case | [`application/usecase/claims/UserClaimsUseCase`](../../src/main/java/io/github/edmaputra/enhauthserv/application/usecase/claims/UserClaimsUseCase.java) (+ `ClaimType`, `UserAttributeData`, `UserProfileData`) |
-| Data port | `application/usecase/claims/UserClaimsDataPort` |
-| Data adapter | [`adapter/out/persistence/UserClaimsRepositoryAdapter`](../../src/main/java/io/github/edmaputra/enhauthserv/adapter/out/persistence/UserClaimsRepositoryAdapter.java) |
+| Claim service | [`claims/UserClaimsService`](../../src/main/java/io/github/edmaputra/enhauthserv/claims/UserClaimsService.java) (+ `ClaimType`, `UserAttributeData`, `UserProfileData`) |
+| Claim data access | `claims/UserClaimsDataProvider` (`@Component` aggregating `users/UserProfileRepository`, `users/UserProfileAttributeRepository`, `claims/ClaimInclusionRuleRepository`) |
 | Tenant resolution | `tenancy/TenantContext` |
-| Entities | `entity/UserProfile`, `entity/UserProfileAttribute`, `entity/ClaimInclusionRule`, `entity/ClaimTarget` |
-| Repositories | `repository/UserProfileRepository`, `UserProfileAttributeRepository`, `ClaimInclusionRuleRepository` |
+| Feature models | `users/UserProfile`, `users/UserProfileAttribute`, `claims/ClaimInclusionRule`, `claims/ClaimTarget` |
+| Feature repositories | `users/UserProfileRepository`, `users/UserProfileAttributeRepository`, `claims/ClaimInclusionRuleRepository` |
 | Injection points | `oauth/SecurityConfig.userInfoMapper(...)`, `oauth/SecurityConfig.jwtTokenCustomizer(...)` |
 | Seeding | `oauth/SecurityConfig` demo seeders (`demoUserProfileSeeder`, `demoUserProfileAttributeSeeder`, `demoClaimInclusionRuleSeeder`) |
 
 Notes from the code:
 
-- `UserClaimsUseCase.getClaims` resolves the tenant via `TenantContext.getCurrentTenantOrDefault("demo")`, loads attributes, then asks `findIncludedAttributeKeys(tenant, keys, claimType)` for the subset whose rule targets the requested `ClaimType`.
+- `UserClaimsService.getClaims` resolves the tenant via `TenantContext.getCurrentTenantOrDefault("demo")`, loads attributes, then asks `findIncludedAttributeKeys(tenant, keys, claimType)` for the subset whose rule targets the requested `ClaimType`.
 - Each attribute is dropped if its key is blank, in `RESERVED_CLAIMS`, or not in the included set.
-- `getOrDefaultProfile` falls back to a synthetic `UserProfileData` (`username@example.com`, `en-US`, `UTC`, …) when no profile row exists.
+- `getOrDefaultProfile` falls back to a synthetic `UserProfileData` (`username@example.com`, `en-US`, `UTC`, …) when no profile data exists.
 
 ## Claims assembly — sequence
 
 ```mermaid
 sequenceDiagram
     participant Caller as userInfoMapper / jwtTokenCustomizer
-    participant UC as UserClaimsUseCase
+    participant UC as UserClaimsService
     participant T as TenantContext
-    participant D as UserClaimsRepositoryAdapter
-    participant DB as attributes + claim_inclusion_rules
+    participant D as claims/UserClaimsDataProvider
+    participant DB as user profile + claim rule tables
 
     Caller->>UC: getClaims(username, claimType)
     UC->>T: currentTenantOrDefault("demo")
@@ -89,5 +88,5 @@ sequenceDiagram
 
 ## Related tests
 
-- `UserClaimsUseCaseTests` — filtering by `ClaimType`, reserved-claim exclusion.
+- `UserClaimsServiceTests` — filtering by `ClaimType`, reserved-claim exclusion.
 - `OidcUserInfoEndpointTests` — end-to-end UserInfo claims.

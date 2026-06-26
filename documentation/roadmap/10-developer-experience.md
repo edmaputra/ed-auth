@@ -31,7 +31,7 @@ The platform's value is multiplied by how easily developers integrate and admins
 - Move the current static consent/login pages to a themeable template system with per-tenant overrides.
 
 ## Fit
-Add a management API module under `adapter/in/http` backed by existing use cases; a `NotificationTemplatePort` and per-tenant theme config; an event-publishing port for webhooks.
+Add a management-API slice with controllers backed by existing slice services; a notification-template component and per-tenant theme config; an event-publishing component for webhooks.
 
 ## Why it matters
 Adoption depends on integration speed. Good admin tooling and developer ergonomics reduce support load and make the IdP self-serve for tenants.

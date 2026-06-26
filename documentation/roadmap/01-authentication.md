@@ -11,7 +11,7 @@ Today the IdP authenticates users with username/password form login (`demo-user`
 - **Push notifications** — approve/deny prompts via a mobile app.
 - **Recovery / backup codes**.
 
-*Fit:* a new `MfaChallengeUseCase` + ports; an additional Spring Security filter/`AuthenticationProvider` between credential check and session establishment.
+*Fit:* a new `authentication` (or `mfa`) slice with an `MfaChallengeService`; an additional Spring Security filter/`AuthenticationProvider` between credential check and session establishment.
 
 ### Passwordless authentication
 - Magic links (email).
@@ -22,7 +22,7 @@ Today the IdP authenticates users with username/password form login (`demo-user`
 - Signals: device fingerprint, IP reputation/geo-velocity, new-device detection.
 - Outcome: allow / step-up / deny. Step-up triggers MFA only when risk is elevated.
 
-*Fit:* a `RiskEvaluationPort` consulted by the login flow; pluggable scorers.
+*Fit:* a `RiskEvaluationService` in the authentication slice consulted by the login flow; pluggable scorer components.
 
 ### Step-up authentication
 - Require a stronger factor for sensitive scopes/operations (`acr`/`amr` claims, OIDC `acr_values`).

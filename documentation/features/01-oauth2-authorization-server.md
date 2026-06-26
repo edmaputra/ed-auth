@@ -34,6 +34,18 @@ EnhAuthServ is a full OAuth 2.0 Authorization Server (RFC 6749) built on Spring 
 3. **`@Order(3)` Introspection/Revocation** — non-tenant `/oauth2/introspect|revoke`, `permitAll`.
 4. **`@Order(4)` Default** — form login; everything authenticated except `/logged-out` and the per-tenant discovery/JWKS endpoints.
 
+## Module ownership
+
+| Package | Responsibility |
+|---|---|
+| `authorization/` | Authorization-code policy, PKCE validation, and scope rules for interactive and machine flows |
+| `clients/` | Client registration bootstrap, client authentication, and allowed client scopes |
+| `consent/` | Consent decision flow and persistence used during first-time or expanded authorization |
+| `tokens/` | Token issuance rules, refresh handling, introspection, and revocation behavior |
+| `oauth/` | Spring Security wiring, metadata, issuer, JWKs, and authorization-server configuration |
+| `tenancy/` | Tenant resolution that scopes authorization-server requests per tenant |
+| `shared/` | Shared logout and cross-feature helpers used by the auth-server flow |
+
 ## Authorization Code flow (summary)
 
 ```text
@@ -182,4 +194,6 @@ sequenceDiagram
 
 ## Related tests
 
-- `AuthServerAuthorizationFlowTests`, `AuthServerPkceFlowTests`, `AuthServerTokenEndpointTests`, `AuthServerIntegrationTests`
+- `authorization/AuthServerAuthorizationFlowTests`, `authorization/AuthServerPkceFlowTests`
+- `tokens/AuthServerTokenEndpointTests`
+- `integration/AuthServerIntegrationTests`
