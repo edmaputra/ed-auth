@@ -1,26 +1,45 @@
 package io.github.edmaputra.enhauthserv.application.usecase.revocation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import io.github.edmaputra.enhauthserv.application.port.out.ClientAuthenticationResult;
-import io.github.edmaputra.enhauthserv.application.port.out.TokenRevocationPort;
 import io.github.edmaputra.enhauthserv.application.usecase.authorization.AuthorizationPolicyResult;
+import io.github.edmaputra.enhauthserv.application.usecase.authorization.AuthorizationPolicyUseCase;
+import io.github.edmaputra.enhauthserv.clients.ClientAuthenticationResult;
+import io.github.edmaputra.enhauthserv.clients.ClientAuthenticationService;
+import io.github.edmaputra.enhauthserv.tokens.revocation.TokenRevoker;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class RevokeTokenUseCaseTests {
+
+  @Mock
+  private ClientAuthenticationService clientAuthenticationService;
+
+  @Mock
+  private TokenRevoker tokenRevoker;
+
+  @Mock
+  private AuthorizationPolicyUseCase authorizationPolicyUseCase;
+
+  private RevokeTokenUseCase useCase;
+
+  @BeforeEach
+  void setUp() {
+    useCase = new RevokeTokenUseCase(
+        clientAuthenticationService,
+        tokenRevoker,
+        authorizationPolicyUseCase);
+  }
 
   @Test
   void missingTokenReturnsBadRequest() {
-    RevokeTokenUseCase useCase = new RevokeTokenUseCase(
-        authorizationHeader -> ClientAuthenticationResult.success(
-            "demo-client",
-            "registered-demo-client",
-            Set.of("revocation")),
-        (token, tokenTypeHint, registeredClientId) -> {},
-        command -> AuthorizationPolicyResult.success());
-
     RevokeTokenResult result = useCase.revoke(new RevokeTokenCommand("", "access_token", "Basic abc"));
 
     assertThat(result.status()).isEqualTo(RevokeTokenResult.Status.BAD_REQUEST);
@@ -29,10 +48,8 @@ class RevokeTokenUseCaseTests {
 
   @Test
   void unauthenticatedClientReturnsUnauthorized() {
-    RevokeTokenUseCase useCase = new RevokeTokenUseCase(
-        authorizationHeader -> ClientAuthenticationResult.failed(null),
-        (token, tokenTypeHint, registeredClientId) -> {},
-        command -> AuthorizationPolicyResult.success());
+    when(clientAuthenticationService.authenticateBasic("Basic bad"))
+        .thenReturn(ClientAuthenticationResult.failed(null));
 
     RevokeTokenResult result = useCase.revoke(new RevokeTokenCommand("token-value", "access_token", "Basic bad"));
 
@@ -42,13 +59,13 @@ class RevokeTokenUseCaseTests {
 
   @Test
   void clientWithoutRevocationScopeReturnsForbidden() {
-    RevokeTokenUseCase useCase = new RevokeTokenUseCase(
-        authorizationHeader -> ClientAuthenticationResult.success(
+    when(clientAuthenticationService.authenticateBasic("Basic abc"))
+        .thenReturn(ClientAuthenticationResult.success(
             "demo-client",
             "registered-demo-client",
-            Set.of("read")),
-        (token, tokenTypeHint, registeredClientId) -> {},
-        command -> AuthorizationPolicyResult.missingScope("revocation"));
+            Set.of("read")));
+    when(authorizationPolicyUseCase.validateScope(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(AuthorizationPolicyResult.missingScope("revocation"));
 
     RevokeTokenResult result = useCase.revoke(new RevokeTokenCommand("token-value", "access_token", "Basic abc"));
 
@@ -57,31 +74,19 @@ class RevokeTokenUseCaseTests {
   }
 
   @Test
-  void successfulRevocationDelegatesToOutputPort() {
-    AtomicReference<String> capturedToken = new AtomicReference<>();
-    AtomicReference<String> capturedTokenTypeHint = new AtomicReference<>();
-    AtomicReference<String> capturedRegisteredClientId = new AtomicReference<>();
-
-    TokenRevocationPort revocationPort = (token, tokenTypeHint, registeredClientId) -> {
-      capturedToken.set(token);
-      capturedTokenTypeHint.set(tokenTypeHint);
-      capturedRegisteredClientId.set(registeredClientId);
-    };
-
-    RevokeTokenUseCase useCase = new RevokeTokenUseCase(
-        authorizationHeader -> ClientAuthenticationResult.success(
+  void successfulRevocationDelegatesToTokenRevoker() {
+    when(clientAuthenticationService.authenticateBasic("Basic abc"))
+        .thenReturn(ClientAuthenticationResult.success(
             "demo-client",
             "registered-demo-client",
-            Set.of("revocation", "read")),
-        revocationPort,
-        command -> AuthorizationPolicyResult.success());
+            Set.of("revocation", "read")));
+    when(authorizationPolicyUseCase.validateScope(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(AuthorizationPolicyResult.success());
 
     RevokeTokenResult result = useCase.revoke(
         new RevokeTokenCommand("token-value", "refresh_token", "Basic abc"));
 
     assertThat(result.status()).isEqualTo(RevokeTokenResult.Status.OK);
-    assertThat(capturedToken.get()).isEqualTo("token-value");
-    assertThat(capturedTokenTypeHint.get()).isEqualTo("refresh_token");
-    assertThat(capturedRegisteredClientId.get()).isEqualTo("registered-demo-client");
+    verify(tokenRevoker).revokeTokenForClient("token-value", "refresh_token", "registered-demo-client");
   }
 }

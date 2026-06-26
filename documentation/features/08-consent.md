@@ -52,7 +52,7 @@ Location: /oauth2/authorize?client_id=demo-client&response_type=code
 
 ## Flow (`AuthorizationConsentUseCase`)
 
-- `checkConsent(command)` → `ConsentDecisionResult`: determines whether the user (`principalName`) has already authorized the client for all requested scopes, via `ConsentStoragePort`.
+- `checkConsent(command)` → `ConsentDecisionResult`: determines whether the user (`principalName`) has already authorized the client for all requested scopes, via `ConsentStore`.
 - `approveConsent(command)`: persists the approved scopes.
 
 Consent records are stored in `oauth2_authorization_consent` and, like all OAuth2 state, are **tenant-scoped** through `TenantAwareOAuth2AuthorizationConsentService`. A returning user who already granted the requested scopes skips the screen.
@@ -61,19 +61,19 @@ Consent records are stored in `oauth2_authorization_consent` and, like all OAuth
 
 | Concern | Class / file |
 |---|---|
-| Controller | [`adapter/in/http/OAuth2AuthorizationConsentController`](../../src/main/java/io/github/edmaputra/enhauthserv/adapter/in/http/OAuth2AuthorizationConsentController.java) |
-| Input port + use case | `AuthorizationConsentInputPort` → [`AuthorizationConsentUseCase`](../../src/main/java/io/github/edmaputra/enhauthserv/application/usecase/consent/AuthorizationConsentUseCase.java) (+ `CheckConsentCommand`, `ConsentDecisionResult`) |
-| Storage port | `ConsentStoragePort` → `adapter/out/security/ConsentStorageAdapter` |
-| Consent store | `TenantAwareOAuth2AuthorizationConsentService` (tenant-scoped) |
+| Controller | [`consent/OAuth2AuthorizationConsentController`](../../src/main/java/io/github/edmaputra/enhauthserv/consent/OAuth2AuthorizationConsentController.java) |
+| Use case | [`application/usecase/consent/AuthorizationConsentUseCase`](../../src/main/java/io/github/edmaputra/enhauthserv/application/usecase/consent/AuthorizationConsentUseCase.java) (+ `CheckConsentCommand`, `ConsentDecisionResult`) |
+| Storage | `consent/ConsentStore` |
+| Consent store | `oauth/TenantAwareOAuth2AuthorizationConsentService` (tenant-scoped) |
 | Client lookup | `RegisteredClientRepository` (for client name on the form) |
-| Filter chain | included in `SecurityConfig` `@Order(2)` matcher (`/oauth2/authorize-consent`); authenticated |
+| Filter chain | included in `oauth/SecurityConfig` `@Order(2)` matcher (`/oauth2/authorize-consent`); authenticated |
 | View | `authorize-consent` template (and `consent-error` for unknown clients) |
 
 Notes from the code:
 
 - The controller resolves `principalName` from the authenticated `Authentication`; scopes arrive space-delimited and are split into a `Set`.
-- `checkConsent` consults `ConsentStoragePort.isMissingConsent(...)`; if nothing is missing it redirects straight back to `/oauth2/authorize` without showing the form.
-- `approveConsent` persists via `ConsentStoragePort.saveConsent(...)` then redirects with `consent_approved=true`.
+- `checkConsent` consults `ConsentStore.isMissingConsent(...)`; if nothing is missing it redirects straight back to `/oauth2/authorize` without showing the form.
+- `approveConsent` persists via `ConsentStore.saveConsent(...)` then redirects with `consent_approved=true`.
 
 ## Consent — sequence
 
@@ -82,7 +82,7 @@ sequenceDiagram
     participant UA as User-Agent
     participant Ctrl as OAuth2AuthorizationConsentController
     participant UC as AuthorizationConsentUseCase
-    participant CS as ConsentStoragePort
+    participant CS as ConsentStore
     participant Store as TenantAwareOAuth2AuthorizationConsentService
 
     UA->>Ctrl: GET /oauth2/authorize-consent (client_id, scopes, ...)

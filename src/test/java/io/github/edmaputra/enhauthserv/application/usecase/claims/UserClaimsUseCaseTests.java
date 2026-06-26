@@ -2,8 +2,8 @@ package io.github.edmaputra.enhauthserv.application.usecase.claims;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.edmaputra.enhauthserv.application.port.out.CurrentTenantPort;
-import io.github.edmaputra.enhauthserv.application.port.out.UserClaimsDataPort;
+import io.github.edmaputra.enhauthserv.application.usecase.claims.UserClaimsDataPort;
+import io.github.edmaputra.enhauthserv.tenancy.TenantContext;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -14,8 +14,9 @@ class UserClaimsUseCaseTests {
 
   @Test
   void returnsDefaultProfileWhenProfileIsMissing() {
-    CurrentTenantPort tenantPort = (defaultTenant) -> "demo";
-    UserClaimsDataPort dataPort = new UserClaimsDataPort() {
+    TenantContext.setCurrentTenant("demo");
+    try {
+      UserClaimsDataPort dataPort = new UserClaimsDataPort() {
       @Override
       public Optional<UserProfileData> findUserProfile(String tenantId, String username) {
         return Optional.empty();
@@ -35,19 +36,23 @@ class UserClaimsUseCaseTests {
       }
     };
 
-    UserClaimsUseCase useCase = new UserClaimsUseCase(tenantPort, dataPort);
+      UserClaimsUseCase useCase = new UserClaimsUseCase(dataPort);
 
-    UserProfileData profile = useCase.getOrDefaultProfile("demo-user");
+      UserProfileData profile = useCase.getOrDefaultProfile("demo-user");
 
-    assertThat(profile.username()).isEqualTo("demo-user");
-    assertThat(profile.tenant()).isEqualTo("demo");
-    assertThat(profile.email()).isEqualTo("demo-user@example.com");
+      assertThat(profile.username()).isEqualTo("demo-user");
+      assertThat(profile.tenant()).isEqualTo("demo");
+      assertThat(profile.email()).isEqualTo("demo-user@example.com");
+    } finally {
+      TenantContext.clear();
+    }
   }
 
   @Test
   void filtersReservedAndNonIncludedClaims() {
-    CurrentTenantPort tenantPort = (defaultTenant) -> "demo";
-    UserClaimsDataPort dataPort = new UserClaimsDataPort() {
+    TenantContext.setCurrentTenant("demo");
+    try {
+      UserClaimsDataPort dataPort = new UserClaimsDataPort() {
       @Override
       public Optional<UserProfileData> findUserProfile(String tenantId, String username) {
         return Optional.empty();
@@ -70,13 +75,16 @@ class UserClaimsUseCaseTests {
       }
     };
 
-    UserClaimsUseCase useCase = new UserClaimsUseCase(tenantPort, dataPort);
+      UserClaimsUseCase useCase = new UserClaimsUseCase(dataPort);
 
-    Map<String, Object> claims = useCase.getClaims("demo-user", ClaimType.ACCESS_TOKEN);
+      Map<String, Object> claims = useCase.getClaims("demo-user", ClaimType.ACCESS_TOKEN);
 
-    assertThat(claims)
-        .containsEntry("favorite_color", "blue")
-        .doesNotContainKey("scope")
-        .doesNotContainKey("region");
+      assertThat(claims)
+          .containsEntry("favorite_color", "blue")
+          .doesNotContainKey("scope")
+          .doesNotContainKey("region");
+    } finally {
+      TenantContext.clear();
+    }
   }
 }

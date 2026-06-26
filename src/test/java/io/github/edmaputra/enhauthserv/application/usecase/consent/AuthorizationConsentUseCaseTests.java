@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.github.edmaputra.enhauthserv.application.port.out.ConsentStoragePort;
+import io.github.edmaputra.enhauthserv.consent.ConsentStore;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,13 +17,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class AuthorizationConsentUseCaseTests {
 
   @Mock
-  private ConsentStoragePort consentStoragePort;
+  private ConsentStore consentStore;
 
   private AuthorizationConsentUseCase useCase;
 
   @BeforeEach
   void setUp() {
-    useCase = new AuthorizationConsentUseCase(consentStoragePort);
+    useCase = new AuthorizationConsentUseCase(consentStore);
   }
 
   @Test
@@ -34,13 +34,13 @@ class AuthorizationConsentUseCaseTests {
     Set<String> requestedScopes = Set.of("read", "profile");
     Set<String> authorizedScopes = Set.of("read", "profile", "email");
 
-    when(consentStoragePort.isMissingConsent(
+    when(consentStore.isMissingConsent(
         principalName,
         registeredClientId,
         requestedScopes))
         .thenReturn(false);
 
-    when(consentStoragePort.getAuthorizedScopes(
+    when(consentStore.getAuthorizedScopes(
         principalName,
         registeredClientId))
         .thenReturn(authorizedScopes);
@@ -66,7 +66,7 @@ class AuthorizationConsentUseCaseTests {
     String registeredClientId = "client-id";
     Set<String> requestedScopes = Set.of("read", "profile", "email");
 
-    when(consentStoragePort.isMissingConsent(
+    when(consentStore.isMissingConsent(
         principalName,
         registeredClientId,
         requestedScopes))
@@ -93,13 +93,13 @@ class AuthorizationConsentUseCaseTests {
     String registeredClientId = "client-id";
     Set<String> requestedScopes = Set.of("read");
 
-    when(consentStoragePort.isMissingConsent(
+    when(consentStore.isMissingConsent(
         principalName,
         registeredClientId,
         requestedScopes))
         .thenReturn(false);
 
-    when(consentStoragePort.getAuthorizedScopes(
+    when(consentStore.getAuthorizedScopes(
         principalName,
         registeredClientId))
         .thenReturn(Set.of());
@@ -133,7 +133,7 @@ class AuthorizationConsentUseCaseTests {
     useCase.approveConsent(command);
 
     // Assert
-    verify(consentStoragePort).saveConsent(
+    verify(consentStore).saveConsent(
         principalName,
         registeredClientId,
         requestedScopes);

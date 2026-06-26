@@ -1,34 +1,27 @@
 package io.github.edmaputra.enhauthserv.application.usecase.revocation;
 
-import io.github.edmaputra.enhauthserv.application.port.in.AuthorizationPolicyInputPort;
-import io.github.edmaputra.enhauthserv.application.port.in.RevokeTokenInputPort;
-import io.github.edmaputra.enhauthserv.application.port.out.ClientAuthenticationPort;
-import io.github.edmaputra.enhauthserv.application.port.out.ClientAuthenticationResult;
-import io.github.edmaputra.enhauthserv.application.port.out.TokenRevocationPort;
+import io.github.edmaputra.enhauthserv.clients.ClientAuthenticationService;
+import io.github.edmaputra.enhauthserv.clients.ClientAuthenticationResult;
+import io.github.edmaputra.enhauthserv.application.usecase.authorization.AuthorizationPolicyUseCase;
 import io.github.edmaputra.enhauthserv.application.usecase.authorization.AuthorizationPolicyResult;
 import io.github.edmaputra.enhauthserv.application.usecase.authorization.ValidateScopeCommand;
+import io.github.edmaputra.enhauthserv.tokens.revocation.TokenRevoker;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 
-public class RevokeTokenUseCase implements RevokeTokenInputPort {
+@Service
+@RequiredArgsConstructor
+public class RevokeTokenUseCase {
 
   private static final String REVOCATION_SCOPE = "revocation";
 
-  private final ClientAuthenticationPort clientAuthenticationPort;
-  private final TokenRevocationPort tokenRevocationPort;
-  private final AuthorizationPolicyInputPort authorizationPolicyInputPort;
+  private final ClientAuthenticationService clientAuthenticationService;
+  private final TokenRevoker tokenRevoker;
+  private final AuthorizationPolicyUseCase authorizationPolicyUseCase;
 
-  public RevokeTokenUseCase(
-      ClientAuthenticationPort clientAuthenticationPort,
-      TokenRevocationPort tokenRevocationPort,
-      AuthorizationPolicyInputPort authorizationPolicyInputPort) {
-    this.clientAuthenticationPort = clientAuthenticationPort;
-    this.tokenRevocationPort = tokenRevocationPort;
-    this.authorizationPolicyInputPort = authorizationPolicyInputPort;
-  }
-
-  @Override
   public RevokeTokenResult revoke(RevokeTokenCommand command) {
     if (command.token() == null || command.token().isBlank()) {
       return error(
@@ -38,7 +31,7 @@ public class RevokeTokenUseCase implements RevokeTokenInputPort {
     }
 
     ClientAuthenticationResult authentication =
-        clientAuthenticationPort.authenticateBasic(command.authorizationHeader());
+        clientAuthenticationService.authenticateBasic(command.authorizationHeader());
     if (!authentication.authenticated()) {
       return error(
           RevokeTokenResult.Status.UNAUTHORIZED,
@@ -51,7 +44,7 @@ public class RevokeTokenUseCase implements RevokeTokenInputPort {
         authentication.clientId(),
         AuthorizationGrantType.CLIENT_CREDENTIALS,
         REVOCATION_SCOPE);
-    AuthorizationPolicyResult policyResult = authorizationPolicyInputPort.validateScope(scopeValidation);
+    AuthorizationPolicyResult policyResult = authorizationPolicyUseCase.validateScope(scopeValidation);
 
     if (!policyResult.authorized()) {
       return error(
@@ -60,7 +53,7 @@ public class RevokeTokenUseCase implements RevokeTokenInputPort {
           policyResult.errorDescription());
     }
 
-    tokenRevocationPort.revokeTokenForClient(
+    tokenRevoker.revokeTokenForClient(
         command.token(),
         command.tokenTypeHint(),
         authentication.registeredClientId());

@@ -12,6 +12,17 @@ This documentation set describes **what the system does today** (Features) and *
 | **Features** | One file per capability — see table below |
 | [Roadmap](roadmap/README.md) | Planned features to cover the full IdP problem space |
 
+## Current code structure
+
+| Area | Packages |
+|---|---|
+| Application logic | `application/usecase/**` |
+| Driving adapters | `adapter/in/http/**`, `adapter/in/filter/**` |
+| Driven adapters | `adapter/out/persistence/**`, `adapter/out/security/**` |
+| Auth / OIDC wiring | `oauth/**`, `consent/**`, `clients/**`, `tokens/**`, `shared/**` |
+| Tenant support | `tenancy/**` |
+| Core domain + persistence | `domain/**`, `entity/**`, `repository/**` |
+
 ## Feature Index
 
 | # | Feature | File |

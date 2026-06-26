@@ -2,11 +2,11 @@
 
 Every piece of OAuth2 state — registered clients, authorizations, consents, users, and profile attributes — is isolated per tenant. Tenant identity is resolved once per request and propagated through a thread-local context.
 
-> **Resolution model:** the tenant is carried **in the request path** (`/t/{tenant}/...`). Header-based resolution (`X-Tenant-ID`) is **not** supported.
+> **Resolution model:** the tenant is carried in the request path (`/t/{tenant}/...`) and may also be supplied via `X-Tenant-ID` when header resolution is enabled.
 
 ## Tenant resolution
 
-`TenantContextFilter` (Spring `OncePerRequestFilter`, **highest precedence**) delegates to `ResolveTenantUseCase`, which resolves the tenant from the request path:
+`tenancy/TenantContextFilter` (Spring `OncePerRequestFilter`, **highest precedence**) delegates to `ResolveTenantService`, which resolves the tenant from the request path and/or trusted header:
 
 1. **Path** (if `path-enabled`) — pattern `/t/{tenant}/...`. For machine endpoints, the path is rewritten (e.g. `/t/{tenant}/oauth2/introspect` → `/oauth2/introspect`) so downstream chains see the canonical path.
 2. **Fallback** — tenant `demo`, unless `require-explicit-tenant=true`, in which case the request is rejected with `400 Bad Request`.
@@ -23,7 +23,7 @@ Thread-local holder:
 - `getCurrentTenantOrDefault(fallback)`
 - `clear()`
 
-Use cases reach it through the `CurrentTenantPort` abstraction rather than touching the thread-local directly.
+Use cases and services read it directly through `TenantContext`.
 
 ## Tenant-aware OAuth2 services
 
@@ -54,21 +54,21 @@ Migration `V0_0_1_007` adds a `tenant_id` discriminator (default `demo`) to `oau
 
 | Concern | Class / file |
 |---|---|
-| Filter registration | `SecurityConfig.tenantContextFilterRegistration(...)` (`HIGHEST_PRECEDENCE`, URL `/*`) |
-| Request filter | [`tenant/TenantContextFilter`](../../src/main/java/io/github/edmaputra/enhauthserv/tenant/TenantContextFilter.java) |
-| Resolution logic | [`application/usecase/tenant/ResolveTenantUseCase`](../../src/main/java/io/github/edmaputra/enhauthserv/application/usecase/tenant/ResolveTenantUseCase.java) + `TenantResolutionPolicy`, `TenantResolutionResult` |
-| Thread-local | [`tenant/TenantContext`](../../src/main/java/io/github/edmaputra/enhauthserv/tenant/TenantContext.java) |
-| Port to use cases | `CurrentTenantPort` → [`adapter/out/tenant/TenantContextAdapter`](../../src/main/java/io/github/edmaputra/enhauthserv/adapter/out/tenant/TenantContextAdapter.java) |
-| Tenant-aware stores | `tenant/TenantAwareRegisteredClientRepository`, `TenantAwareOAuth2AuthorizationService`, `TenantAwareOAuth2AuthorizationConsentService` |
-| Issuer | `tenant/TenantIssuerService` |
+| Filter registration | `oauth/SecurityConfig.tenantContextFilterRegistration(...)` (`HIGHEST_PRECEDENCE`, URL `/*`) |
+| Request filter | [`tenancy/TenantContextFilter`](../../src/main/java/io/github/edmaputra/enhauthserv/tenancy/TenantContextFilter.java) |
+| Resolution logic | [`tenancy/ResolveTenantService`](../../src/main/java/io/github/edmaputra/enhauthserv/tenancy/ResolveTenantService.java) + `TenantResolutionPolicy`, `TenantResolutionResult` |
+| Thread-local | [`tenancy/TenantContext`](../../src/main/java/io/github/edmaputra/enhauthserv/tenancy/TenantContext.java) |
+| Use-case access | `UserClaimsUseCase` reads `TenantContext` directly |
+| Tenant-aware stores | `oauth/TenantAwareRegisteredClientRepository`, `TenantAwareOAuth2AuthorizationService`, `TenantAwareOAuth2AuthorizationConsentService` |
+| Issuer | `tenancy/TenantIssuerService` |
 
 Notes from the code:
 
-- The filter computes a `TenantResolutionResult`; for machine endpoints it returns a **rewritten path** and forwards a `HttpServletRequestWrapper` (`MachineEndpointRewriteRequest`) so the canonical `/oauth2/introspect|revoke` matchers fire downstream.
+- The filter computes a `TenantResolutionResult`; for machine endpoints it returns a **rewritten path** and forwards a `HttpServletRequestWrapper` so the canonical `/oauth2/introspect|revoke` matchers fire downstream.
 - On `invalidRequest()` (strict mode) it writes `400 {"error":"invalid_request"}` directly and stops the chain.
 - `TenantContext.clear()` always runs in `finally`.
 
-> The `ResolveTenantUseCase` and `TenantContextFilter` constructor still accept header-resolution settings (`header-enabled`, `header-name`, …). Those become dead configuration once the [path-only change](#tenant-resolution) lands in code.
+> The `TenantContextFilter` constructor still accepts header-resolution settings (`header-enabled`, `header-name`, …) in addition to path resolution; strict mode still rejects requests that do not resolve a tenant.
 
 ## Tenant resolution — sequence
 
@@ -76,7 +76,7 @@ Notes from the code:
 sequenceDiagram
     participant C as Client
     participant F as TenantContextFilter
-    participant R as ResolveTenantUseCase
+    participant R as ResolveTenantService
     participant Ctx as TenantContext (thread-local)
     participant Chain as Downstream filter chain
 
@@ -100,4 +100,4 @@ sequenceDiagram
 
 ## Related tests
 
-- `ResolveTenantUseCaseTests`, `TenantContextFilterTests`, `TenantResolutionStrictModeTests`
+- `ResolveTenantServiceTests`, `TenantContextFilterTests`, `TenantResolutionStrictModeTests`

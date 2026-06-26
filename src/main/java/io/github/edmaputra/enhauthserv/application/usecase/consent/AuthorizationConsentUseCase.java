@@ -1,8 +1,8 @@
 package io.github.edmaputra.enhauthserv.application.usecase.consent;
 
-import io.github.edmaputra.enhauthserv.application.port.in.AuthorizationConsentInputPort;
-import io.github.edmaputra.enhauthserv.application.port.out.ConsentStoragePort;
+import io.github.edmaputra.enhauthserv.consent.ConsentStore;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
 /**
  * Use case for managing OAuth2 authorization consent.
@@ -10,15 +10,15 @@ import lombok.RequiredArgsConstructor;
  * Decides whether explicit user consent is required for a client
  * to access specific scopes on behalf of the user.
  */
+@Service
 @RequiredArgsConstructor
-public class AuthorizationConsentUseCase implements AuthorizationConsentInputPort {
+public class AuthorizationConsentUseCase {
 
-  private final ConsentStoragePort consentStoragePort;
+  private final ConsentStore consentStore;
 
-  @Override
   public ConsentDecisionResult checkConsent(CheckConsentCommand command) {
     // Check if user is missing consent for any of the requested scopes
-    if (consentStoragePort.isMissingConsent(
+    if (consentStore.isMissingConsent(
         command.principalName(),
         command.registeredClientId(),
         command.requestedScopes())) {
@@ -27,16 +27,15 @@ public class AuthorizationConsentUseCase implements AuthorizationConsentInputPor
     }
 
     // User has already authorized these scopes; retrieve the authorized set
-    var authorizedScopes = consentStoragePort.getAuthorizedScopes(
+    var authorizedScopes = consentStore.getAuthorizedScopes(
         command.principalName(),
         command.registeredClientId());
 
     return ConsentDecisionResult.noConsentNeeded(authorizedScopes);
   }
 
-  @Override
   public void approveConsent(CheckConsentCommand command) {
-    consentStoragePort.saveConsent(
+    consentStore.saveConsent(
         command.principalName(),
         command.registeredClientId(),
         command.requestedScopes());

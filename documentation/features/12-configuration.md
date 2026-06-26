@@ -23,12 +23,16 @@ See [Token Policy](04-token-policy.md).
 
 ## Tenant resolution (`tenant.resolution.*`)
 
-Tenant is resolved from the request path (`/t/{tenant}/`) only; there is no header-based resolution.
+Tenant can be resolved from the request path (`/t/{tenant}/`) or from a trusted `X-Tenant-ID` header when header resolution is enabled.
 
 | Property | Default | Description |
 |---|---|---|
+| `header-enabled` | `true` | Allow tenant resolution from the header |
 | `path-enabled` | `true` | Resolve tenant from `/t/{tenant}/` |
 | `require-explicit-tenant` | `false` | Reject requests without a resolved tenant |
+| `enforce-trusted-proxy-for-header` | `false` | Only honor header resolution from trusted sources |
+| `header-name` | `X-Tenant-ID` | Request header name |
+| `header-trusted-sources` | `127.0.0.1,::1,0:0:0:0:0:0:0:1` | Allowed remote addresses for header resolution when trusted-proxy enforcement is on |
 
 See [Multi-Tenancy](03-multi-tenancy.md).
 
@@ -49,12 +53,12 @@ See [Multi-Tenancy](03-multi-tenancy.md).
 
 | Property group | Bound / consumed by |
 |---|---|
-| `app.token.*` | [`config/TokenPolicyProperties`](../../src/main/java/io/github/edmaputra/enhauthserv/config/TokenPolicyProperties.java) → `SecurityConfig.tokenSettings(...)` + `jwtTokenCustomizer(...)` |
-| `app.issuer-uri` | `SecurityConfig.authorizationServerSettings(...)`, `TenantOidcMetadataController` |
-| `tenant.resolution.*` | [`tenant/TenantContextFilter`](../../src/main/java/io/github/edmaputra/enhauthserv/tenant/TenantContextFilter.java) constructor → `TenantResolutionPolicy` |
+| `app.token.*` | [`tokens/TokenPolicyProperties`](../../src/main/java/io/github/edmaputra/enhauthserv/tokens/TokenPolicyProperties.java) → `oauth/SecurityConfig.tokenSettings(...)` + `jwtTokenCustomizer(...)` |
+| `app.issuer-uri` | `oauth/SecurityConfig.authorizationServerSettings(...)`, `oauth/metadata/TenantOidcMetadataController` |
+| `tenant.resolution.*` | [`tenancy/TenantContextFilter`](../../src/main/java/io/github/edmaputra/enhauthserv/tenancy/TenantContextFilter.java) constructor → `TenantResolutionPolicy` |
 | `spring.datasource.*`, `spring.flyway.*` | Spring Boot autoconfiguration (JDBC stores + Flyway migrations) |
 
 Notes from the code:
 
-- `TokenPolicyProperties` is a `@ConfigurationProperties("app.token")` bean activated by `@EnableConfigurationProperties(TokenPolicyProperties.class)` on `SecurityConfig`.
-- `tenant.resolution.*` values are injected as constructor `@Value`s on `TenantContextFilter` and passed into a `TenantResolutionPolicy`; the header-related ones are slated for removal under the [path-only tenancy change](03-multi-tenancy.md).
+- `TokenPolicyProperties` is a `@ConfigurationProperties("app.token")` bean activated by `@EnableConfigurationProperties(TokenPolicyProperties.class)` on `oauth/SecurityConfig`.
+- `tenant.resolution.*` values are injected as constructor `@Value`s on `TenantContextFilter` and passed into a `TenantResolutionPolicy`.
