@@ -104,12 +104,12 @@ Backed by the `UserProfile` entity: `full_name`, `email`, `email_verified`, `loc
 
 | Concern | Class / file |
 |---|---|
-| Discovery doc | [`adapter/in/http/TenantOidcMetadataController`](../../src/main/java/io/github/edmaputra/enhauthserv/adapter/in/http/TenantOidcMetadataController.java) |
-| JWKS | [`adapter/in/http/TenantJwksController`](../../src/main/java/io/github/edmaputra/enhauthserv/adapter/in/http/TenantJwksController.java) + `JWKSource` bean in `SecurityConfig.jwkSource()` |
-| Per-tenant issuer | [`tenant/TenantIssuerService`](../../src/main/java/io/github/edmaputra/enhauthserv/tenant/TenantIssuerService.java) |
-| UserInfo mapping | `SecurityConfig.userInfoMapper(...)` bean (wired into the `@Order(2)` chain's `oidc().userInfoEndpoint()`) |
-| ID-token claims | `SecurityConfig.jwtTokenCustomizer(...)` (branch on `OidcParameterNames.ID_TOKEN`) |
-| Claim assembly | [`application/usecase/claims/UserClaimsUseCase`](05-dynamic-claims.md) via `UserClaimsInputPort` |
+| Discovery doc | [`oauth/metadata/TenantOidcMetadataController`](../../src/main/java/io/github/edmaputra/enhauthserv/oauth/metadata/TenantOidcMetadataController.java) |
+| JWKS | [`oauth/metadata/TenantJwksController`](../../src/main/java/io/github/edmaputra/enhauthserv/oauth/metadata/TenantJwksController.java) + `JWKSource` bean in `oauth/SecurityConfig.jwkSource()` |
+| Per-tenant issuer | [`tenancy/TenantIssuerService`](../../src/main/java/io/github/edmaputra/enhauthserv/tenancy/TenantIssuerService.java) |
+| UserInfo mapping | `oauth/SecurityConfig.userInfoMapper(...)` bean (wired into the `@Order(2)` chain's `oidc().userInfoEndpoint()`) |
+| ID-token claims | `oauth/SecurityConfig.jwtTokenCustomizer(...)` (branch on `OidcParameterNames.ID_TOKEN`) |
+| Claim assembly | [`application/usecase/claims/UserClaimsUseCase`](05-dynamic-claims.md) |
 
 Notes from the code:
 

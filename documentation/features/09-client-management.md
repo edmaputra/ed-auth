@@ -1,16 +1,16 @@
 # Feature 9 — Client Management & Bootstrap
 
-Registered OAuth2 clients are persisted in `oauth2_registered_client` and accessed through the tenant-aware `RegisteredClientRepository`. On startup, a set of demo clients is seeded for local development.
+Registered OAuth2 clients are persisted in `oauth2_registered_client` and accessed through the tenant-aware `RegisteredClientRepository`. On startup, a set of demo clients is seeded for local development by `ClientBootstrapService`.
 
 ## Client storage
 
-- `TenantAwareRegisteredClientRepository` (extends `JdbcRegisteredClientRepository`) stamps and filters `tenant_id` on save/lookup.
-- `RegisteredClientManagementPort` (`RegisteredClientRepositoryAdapter`) exposes `findByClientId` / `save` to use cases.
-- `ScopeValidationPort` (`ScopeValidationAdapter`) answers `getClientScopes` / `clientHasScope`, used by the introspection and revocation policy checks.
+- `oauth/TenantAwareRegisteredClientRepository` (extends `JdbcRegisteredClientRepository`) stamps and filters `tenant_id` on save/lookup.
+- `clients/ClientBootstrapService` seeds the built-in clients.
+- `clients/ClientScopeService` answers `getClientScopes` / `clientHasScope`, used by the introspection and revocation policy checks.
 
-## Bootstrap (`DefaultRegisteredClientBootstrapUseCase`)
+## Bootstrap (`ClientBootstrapService`)
 
-`ensureDefaultClients()` runs at startup (via a `CommandLineRunner` in `SecurityConfig`) and seeds:
+`ensureDefaultClients()` runs at startup (via a `CommandLineRunner` in `ClientsConfig`) and seeds:
 
 ### `demo-client` (confidential)
 - Secret: `demo-secret` (BCrypt)
@@ -27,7 +27,7 @@ Registered OAuth2 clients are persisted in `oauth2_registered_client` and access
 
 ## Demo user seeding
 
-`SecurityConfig` also seeds the demo end user and its identity data:
+`oauth/SecurityConfig` also seeds the demo end user and its identity data:
 
 - **User** `demo-user` / `demo-password`, role `ROLE_USER`
 - **Profile**: Demo User, `demo-user@example.com`, locale `en-US`, zoneinfo `Asia/Jakarta`, department `engineering`, tenant `demo`
@@ -37,17 +37,16 @@ Registered OAuth2 clients are persisted in `oauth2_registered_client` and access
 
 | Concern | Class / file |
 |---|---|
-| Bootstrap use case | `RegisteredClientBootstrapInputPort` → [`DefaultRegisteredClientBootstrapUseCase`](../../src/main/java/io/github/edmaputra/enhauthserv/application/usecase/registration/DefaultRegisteredClientBootstrapUseCase.java) |
-| Management port | `RegisteredClientManagementPort` → `adapter/out/security/RegisteredClientRepositoryAdapter` |
-| Scope queries | `ScopeValidationPort` → `adapter/out/security/ScopeValidationAdapter` |
-| Client store | `SecurityConfig.registeredClientRepository(...)` → `TenantAwareRegisteredClientRepository` |
-| Startup trigger | `SecurityConfig.demoRegisteredClientSeeder(...)` (`CommandLineRunner @Order(1)`) |
-| Token settings | `SecurityConfig.tokenSettings(...)` injected into the bootstrap use case |
-| User/profile seeders | `SecurityConfig.demoUserSeeder` / `demoUserProfileSeeder` / `demoUserProfileAttributeSeeder` / `demoClaimInclusionRuleSeeder` |
+| Bootstrap service | [`clients/ClientBootstrapService`](../../src/main/java/io/github/edmaputra/enhauthserv/clients/ClientBootstrapService.java) |
+| Scope queries | `clients/ClientScopeService` |
+| Client store | `oauth/SecurityConfig.registeredClientRepository(...)` → `oauth/TenantAwareRegisteredClientRepository` |
+| Startup trigger | `clients/ClientsConfig.demoRegisteredClientSeeder(...)` (`CommandLineRunner @Order(1)`) |
+| Token settings | `oauth/SecurityConfig.tokenSettings(...)` injected into the bootstrap service |
+| User/profile seeders | `oauth/SecurityConfig.demoUserSeeder` / `demoUserProfileSeeder` / `demoUserProfileAttributeSeeder` / `demoClaimInclusionRuleSeeder` |
 
 Notes from the code:
 
-- `UseCaseWiringConfig.registeredClientBootstrapInputPort(...)` injects `RegisteredClientManagementPort`, `PasswordEncoder` (BCrypt), and `TokenSettings`.
+- `ClientBootstrapService` injects `RegisteredClientRepository`, `PasswordEncoder` (BCrypt), and `TokenSettings`.
 - The seeder runs at startup; `ensureDefaultClients()` is idempotent (clients are only created if absent).
 - The demo user (`demo-user`) is created via `JdbcUserDetailsManager`; profile/attribute/rule seeders run as ordered `CommandLineRunner`s after it.
 
@@ -57,21 +56,18 @@ Notes from the code:
 sequenceDiagram
     participant Boot as Spring Boot startup
     participant Runner as demoRegisteredClientSeeder (CommandLineRunner)
-    participant UC as DefaultRegisteredClientBootstrapUseCase
-    participant Mgmt as RegisteredClientManagementPort
-    participant Repo as TenantAwareRegisteredClientRepository
+    participant UC as ClientBootstrapService
+    participant Repo as oauth/TenantAwareRegisteredClientRepository
     participant DB as oauth2_registered_client
 
     Boot->>Runner: run(args)
     Runner->>UC: ensureDefaultClients()
     loop demo-client, pkce-public-client
-        UC->>Mgmt: findByClientId(clientId)
-        Mgmt->>Repo: findByClientId
+        UC->>Repo: findByClientId(clientId)
         Repo->>DB: query (tenant-scoped)
         DB-->>Repo: existing? 
         alt missing
-            UC->>Mgmt: save(RegisteredClient)
-            Mgmt->>Repo: save
+            UC->>Repo: save(RegisteredClient)
             Repo->>DB: insert
         end
     end
@@ -80,4 +76,4 @@ sequenceDiagram
 
 ## Related tests
 
-- `DefaultRegisteredClientBootstrapUseCaseTests`
+- `ClientBootstrapServiceTests`

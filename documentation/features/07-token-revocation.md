@@ -41,9 +41,9 @@ token=8xLOxBtZp8...&token_type_hint=refresh_token
 ## Flow (`RevokeTokenUseCase`)
 
 1. Validate `token` is present → otherwise `400 invalid_request`.
-2. Authenticate the client via HTTP Basic (`ClientAuthenticationPort`) → otherwise `401`.
-3. Confirm the client holds the `revocation` scope (`AuthorizationPolicyInputPort`) → otherwise `403 unauthorized_client`.
-4. Delegate to `TokenRevocationPort`, which invalidates the token for the authenticated client via the (tenant-aware) `OAuth2AuthorizationService`.
+2. Authenticate the client via HTTP Basic (`clients/ClientAuthenticationService`) → otherwise `401`.
+3. Confirm the client holds the `revocation` scope (`application/usecase/authorization/AuthorizationPolicyUseCase` + `clients/ClientScopeService`) → otherwise `403 unauthorized_client`.
+4. Delegate to `tokens/revocation/TokenRevoker`, which invalidates the token for the authenticated client via the tenant-aware `OAuth2AuthorizationService`.
 
 A client may only revoke tokens it owns; revocation is scoped to the authenticated `registeredClientId`.
 
@@ -52,11 +52,11 @@ A client may only revoke tokens it owns; revocation is scoped to the authenticat
 | Concern | Class / file |
 |---|---|
 | Controller | [`adapter/in/http/OAuth2TokenRevocationController`](../../src/main/java/io/github/edmaputra/enhauthserv/adapter/in/http/OAuth2TokenRevocationController.java) |
-| Input port + use case | `RevokeTokenInputPort` → [`RevokeTokenUseCase`](../../src/main/java/io/github/edmaputra/enhauthserv/application/usecase/revocation/RevokeTokenUseCase.java) (+ `RevokeTokenCommand`, `RevokeTokenResult`) |
-| Client auth | `ClientAuthenticationPort` → `adapter/out/security/ClientAuthenticationAdapter` → `service/ClientAuthenticationService` |
-| Scope policy | `AuthorizationPolicyInputPort` → `AuthorizationPolicyUseCase` → `ScopeValidationPort` → `ScopeValidationAdapter` |
-| Revocation | `TokenRevocationPort` → `adapter/out/token/TokenRevocationAdapter` (+ `service/RevocationAuthorizationService`) → `TenantAwareOAuth2AuthorizationService` |
-| Filter chains | `SecurityConfig` `@Order(1)` (tenant path) and `@Order(3)` (base path), both permitAll |
+| Use case | [`application/usecase/revocation/RevokeTokenUseCase`](../../src/main/java/io/github/edmaputra/enhauthserv/application/usecase/revocation/RevokeTokenUseCase.java) (+ `RevokeTokenCommand`, `RevokeTokenResult`) |
+| Client auth | `clients/ClientAuthenticationService` |
+| Scope policy | `application/usecase/authorization/AuthorizationPolicyUseCase` + `clients/ClientScopeService` |
+| Revocation | `tokens/revocation/TokenRevoker` |
+| Filter chains | `oauth/SecurityConfig` `@Order(1)` (tenant path) and `@Order(3)` (base path), both permitAll |
 
 Notes from the code:
 
@@ -70,9 +70,9 @@ sequenceDiagram
     participant Cl as Client
     participant Ctrl as OAuth2TokenRevocationController
     participant UC as RevokeTokenUseCase
-    participant Auth as ClientAuthenticationPort
-    participant Pol as AuthorizationPolicyInputPort
-    participant Rev as TokenRevocationPort
+    participant Auth as ClientAuthenticationService
+    participant Pol as AuthorizationPolicyUseCase
+    participant Rev as TokenRevoker
     participant Store as TenantAwareOAuth2AuthorizationService
 
     Cl->>Ctrl: POST /oauth2/revoke (Basic auth, token, hint?)

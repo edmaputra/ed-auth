@@ -62,8 +62,8 @@ token=eyJraWQ...
 ## Flow (`IntrospectTokenUseCase`)
 
 1. Validate that `token` is present → otherwise `400 invalid_request`.
-2. Authenticate the calling client via HTTP Basic (`ClientAuthenticationPort`) → otherwise `401`.
-3. Confirm the client holds the `introspection` scope (`AuthorizationPolicyInputPort` → `ScopeValidationPort`) → otherwise `403 unauthorized_client`.
+2. Authenticate the calling client via HTTP Basic (`clients/ClientAuthenticationService`) → otherwise `401`.
+3. Confirm the client holds the `introspection` scope (`application/usecase/authorization/AuthorizationPolicyUseCase` + `clients/ClientScopeService`) → otherwise `403 unauthorized_client`.
 4. Delegate to `TokenIntrospectionPort` → `TokenIntrospectionValidator` for the actual RFC 7662 evaluation.
 
 ## Why a custom endpoint
@@ -75,11 +75,11 @@ Custom introspection/revocation use cases run as `permitAll` chains; client auth
 | Concern | Class / file |
 |---|---|
 | Controller | [`adapter/in/http/OAuth2TokenIntrospectionController`](../../src/main/java/io/github/edmaputra/enhauthserv/adapter/in/http/OAuth2TokenIntrospectionController.java) |
-| Input port + use case | `IntrospectTokenInputPort` → [`IntrospectTokenUseCase`](../../src/main/java/io/github/edmaputra/enhauthserv/application/usecase/introspection/IntrospectTokenUseCase.java) (+ `IntrospectTokenCommand`, `IntrospectTokenResult`) |
-| Client auth | `ClientAuthenticationPort` → `adapter/out/security/ClientAuthenticationAdapter` → `service/ClientAuthenticationService` |
-| Scope policy | `AuthorizationPolicyInputPort` → `AuthorizationPolicyUseCase` → `ScopeValidationPort` → `adapter/out/security/ScopeValidationAdapter` |
-| Token check | `TokenIntrospectionPort` → `adapter/out/token/TokenIntrospectionAdapter` → `service/TokenIntrospectionValidator` |
-| Filter chains | `SecurityConfig` `@Order(1)` (tenant path, permitAll) and `@Order(3)` (base path, permitAll) |
+| Use case | [`application/usecase/introspection/IntrospectTokenUseCase`](../../src/main/java/io/github/edmaputra/enhauthserv/application/usecase/introspection/IntrospectTokenUseCase.java) (+ `IntrospectTokenCommand`, `IntrospectTokenResult`) |
+| Client auth | `clients/ClientAuthenticationService` |
+| Scope policy | `application/usecase/authorization/AuthorizationPolicyUseCase` + `clients/ClientScopeService` |
+| Token check | `service/TokenIntrospectionValidator` |
+| Filter chains | `oauth/SecurityConfig` `@Order(1)` (tenant path, permitAll) and `@Order(3)` (base path, permitAll) |
 
 Notes from the code:
 
@@ -93,8 +93,8 @@ sequenceDiagram
     participant RS as Resource server
     participant Ctrl as OAuth2TokenIntrospectionController
     participant UC as IntrospectTokenUseCase
-    participant Auth as ClientAuthenticationPort
-    participant Pol as AuthorizationPolicyInputPort
+    participant Auth as ClientAuthenticationService
+    participant Pol as AuthorizationPolicyUseCase
     participant Tok as TokenIntrospectionPort
     participant V as TokenIntrospectionValidator
 

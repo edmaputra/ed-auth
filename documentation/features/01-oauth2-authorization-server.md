@@ -126,19 +126,19 @@ Access and ID tokens are **signed JWTs** (RSA). Signing keys are exposed per ten
 
 ## Implementation
 
-The protocol endpoints themselves are provided by **Spring Authorization Server** — this project does not hand-write `/oauth2/authorize` or `/oauth2/token`. The project's code configures and customizes that machinery in [`config/SecurityConfig`](../../src/main/java/io/github/edmaputra/enhauthserv/config/SecurityConfig.java).
+The protocol endpoints themselves are provided by **Spring Authorization Server** — this project does not hand-write `/oauth2/authorize` or `/oauth2/token`. The project's code configures and customizes that machinery in [`oauth/SecurityConfig`](../../src/main/java/io/github/edmaputra/enhauthserv/oauth/SecurityConfig.java).
 
 | Concern | Class / bean | Notes |
 |---|---|---|
-| Filter chains (1–4) | `SecurityConfig.tenantMachineEndpointsFilterChain` … `defaultSecurityFilterChain` | Ordered `@Bean SecurityFilterChain`s |
+| Filter chains (1–4) | `oauth/SecurityConfig.tenantMachineEndpointsFilterChain` … `defaultSecurityFilterChain` | Ordered `@Bean SecurityFilterChain`s |
 | AS endpoints enabled | `OAuth2AuthorizationServerConfigurer.authorizationServer()` | Wired in the `@Order(2)` chain |
-| Issuer | `SecurityConfig.authorizationServerSettings(...)` | `AuthorizationServerSettings.builder().issuer(app.issuer-uri)` |
-| Signing key | `SecurityConfig.jwkSource()` | In-memory RSA keypair (`ImmutableJWKSet`) |
-| Client store | `registeredClientRepository` → `TenantAwareRegisteredClientRepository` | Tenant-scoped JDBC repo |
-| Authorization store | `authorizationService` → `TenantAwareOAuth2AuthorizationService` | Holds codes/tokens |
-| Token TTLs | `SecurityConfig.tokenSettings(...)` | From [`TokenPolicyProperties`](04-token-policy.md) |
-| Token claims | `SecurityConfig.jwtTokenCustomizer(...)` | Adds [dynamic claims](05-dynamic-claims.md) + client-credentials scope guard |
-| Login & consent | form login (`@Order(4)`), [`OAuth2AuthorizationConsentController`](08-consent.md) | |
+| Issuer | `oauth/SecurityConfig.authorizationServerSettings(...)` | `AuthorizationServerSettings.builder().issuer(app.issuer-uri)` |
+| Signing key | `oauth/SecurityConfig.jwkSource()` | In-memory RSA keypair (`ImmutableJWKSet`) |
+| Client store | `registeredClientRepository` → `oauth/TenantAwareRegisteredClientRepository` | Tenant-scoped JDBC repo |
+| Authorization store | `authorizationService` → `oauth/TenantAwareOAuth2AuthorizationService` | Holds codes/tokens |
+| Token TTLs | `oauth/SecurityConfig.tokenSettings(...)` | From [`tokens/TokenPolicyProperties`](04-token-policy.md) |
+| Token claims | `oauth/SecurityConfig.jwtTokenCustomizer(...)` | Adds [dynamic claims](05-dynamic-claims.md) + client-credentials scope guard |
+| Login & consent | form login (`@Order(4)`), [`consent/OAuth2AuthorizationConsentController`](08-consent.md) | |
 
 ### Code-path map
 

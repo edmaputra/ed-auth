@@ -54,7 +54,7 @@ spring.datasource.driver-class-name=org.postgresql.Driver
 | Migrations | `src/main/resources/db/migration/V0_0_1_00{1..7}__*.sql` |
 | JPA entities | [`entity/UserProfile`](../../src/main/java/io/github/edmaputra/enhauthserv/entity/UserProfile.java), `entity/UserProfileAttribute`, `entity/ClaimInclusionRule`, `entity/ClaimTarget` |
 | Spring Data repos | `repository/UserProfileRepository`, `repository/UserProfileAttributeRepository`, `repository/ClaimInclusionRuleRepository` |
-| OAuth2 JDBC stores | `tenant/TenantAware*` (extend Spring's `Jdbc*` stores) |
+| OAuth2 JDBC stores | `oauth/TenantAware*` (extend Spring's `Jdbc*` stores) |
 | Datasource/Flyway config | `src/main/resources/application.properties` |
 
 Notes from the code:
