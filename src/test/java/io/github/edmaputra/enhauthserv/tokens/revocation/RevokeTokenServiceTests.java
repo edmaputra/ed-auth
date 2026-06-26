@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv.application.usecase.revocation;
+package io.github.edmaputra.enhauthserv.tokens.revocation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;

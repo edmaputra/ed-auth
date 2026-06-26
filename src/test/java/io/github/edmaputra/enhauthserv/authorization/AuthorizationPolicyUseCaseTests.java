@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv.application.usecase.authorization;
+package io.github.edmaputra.enhauthserv.authorization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

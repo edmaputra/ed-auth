@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv.application.usecase.consent;
+package io.github.edmaputra.enhauthserv.consent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

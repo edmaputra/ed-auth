@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv;
+package io.github.edmaputra.enhauthserv.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,7 +27,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
-abstract class AuthServerIntegrationTests {
+public abstract class AuthServerIntegrationTests {
 
   private static final Pattern CSRF_INPUT_PATTERN = Pattern.compile(
       "name=\"_csrf\"\\s+type=\"hidden\"\\s+value=\"([^\"]+)\"");
@@ -44,7 +44,7 @@ abstract class AuthServerIntegrationTests {
   @LocalServerPort
   protected int port;
 
-  protected static final class AuthorizationCodeFlowResult {
+  public static final class AuthorizationCodeFlowResult {
 
     private final HttpClient client;
 
@@ -55,11 +55,11 @@ abstract class AuthServerIntegrationTests {
       this.idToken = idToken;
     }
 
-    HttpClient client() {
+    public HttpClient client() {
       return this.client;
     }
 
-    String idToken() {
+    public String idToken() {
       return this.idToken;
     }
   }

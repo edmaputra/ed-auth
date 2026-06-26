@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv;
+package io.github.edmaputra.enhauthserv.integration;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

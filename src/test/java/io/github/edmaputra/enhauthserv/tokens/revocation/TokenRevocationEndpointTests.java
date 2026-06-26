@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv;
+package io.github.edmaputra.enhauthserv.tokens.revocation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -7,6 +7,7 @@ import io.github.edmaputra.enhauthserv.tenancy.TenantContext;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import io.github.edmaputra.enhauthserv.integration.AuthServerIntegrationTests;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpEntity;

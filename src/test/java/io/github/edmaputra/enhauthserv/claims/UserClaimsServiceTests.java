@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv.application.usecase.claims;
+package io.github.edmaputra.enhauthserv.claims;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -45,7 +45,6 @@ class UserClaimsServiceTests {
   void filtersReservedAndNonIncludedClaims() {
     TenantContext.setCurrentTenant("demo");
     try {
-      when(dataProvider.findUserProfile("demo", "demo-user")).thenReturn(Optional.empty());
       when(dataProvider.findUserAttributes("demo", "demo-user")).thenReturn(List.of(
           new UserAttributeData("favorite_color", "blue"),
           new UserAttributeData("scope", "read"),
@@ -65,4 +64,3 @@ class UserClaimsServiceTests {
     }
   }
 }
-

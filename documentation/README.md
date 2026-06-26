@@ -8,23 +8,25 @@ This documentation set describes **what the system does today** (Features) and *
 
 | Section | Description |
 |---|---|
-| [Architecture](features/00-architecture.md) | Vertical-slice module map, package boundaries, request lifecycle |
+| [Architecture](features/00-architecture.md) | Module map, package boundaries, request lifecycle |
 | **Features** | One file per capability — see table below |
 | [Roadmap](roadmap/README.md) | Planned features to cover the full IdP problem space |
 
 ## Current code structure
 
-EnhAuthServ is organized as a **Vertical-Slice Modular Monolith**. The main business capabilities are packaged as Spring Modulith application modules, with supporting technical layers kept beside them.
+EnhAuthServ is organized as a **Vertical-Slice Modular Monolith**. Packages are grouped by the feature they implement, and supporting packages stay close to the feature they serve.
 
-| Concern | Packages | Notes |
+| Feature area | Packages | What belongs here |
 |---|---|---|
-| Vertical slices / application modules | `authorization/**`, `claims/**`, `clients/**`, `consent/**`, `tenancy/**`, `tokens/**`, `users/**` | Feature-oriented modules with explicit module boundaries |
-| OAuth / security wiring | `oauth/**`, `shared/**` | Spring Security configuration, metadata, and shared support |
-| Application use cases | `application/usecase/**` | Use-case classes, commands, and module-facing application logic |
-| Input adapters | `adapter/in/http/**`, `adapter/in/filter/**` | HTTP controllers and request filtering |
-| Output adapters | `adapter/out/persistence/**`, `adapter/out/security/**` | Persistence and security implementations |
-| Persistence model | `entity/**`, `repository/**` | JPA entities and Spring Data repositories, kept separate from modules |
-| Spring configuration | `config/**` | Property binding and wiring helpers |
+| Authorization server flow | `authorization/**` | Authorization policy, authorization-code flow, PKCE-related checks, and authorization decisions |
+| OpenID Connect claims | `claims/**` | User claim assembly, claim filtering, and UserInfo claim data |
+| Client management | `clients/**` | Client bootstrap, client authentication, and client scope rules |
+| Consent | `consent/**` | Consent checks, consent storage, and consent approval flow |
+| Tenant resolution | `tenancy/**` | Tenant context, tenant resolution, tenant issuer, and tenant request filtering |
+| Token handling | `tokens/**` | Token policy, token introspection, token revocation, and token lifecycle rules |
+| User profiles | `users/**` | User profile and attribute data used by claims and identity flows |
+| OIDC / security wiring | `oauth/**` | OIDC metadata, JWKs, and Spring Security wiring for auth-server endpoints |
+| Shared support | `shared/**` | Cross-cutting helpers used by multiple feature areas, such as logout support |
 
 See [Architecture](features/00-architecture.md) for the full module map and dependency rules.
 

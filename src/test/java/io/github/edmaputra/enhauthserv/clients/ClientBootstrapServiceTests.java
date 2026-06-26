@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv.application.usecase.registration;
+package io.github.edmaputra.enhauthserv.clients;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -17,7 +17,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
-import io.github.edmaputra.enhauthserv.clients.ClientBootstrapService;
 
 @ExtendWith(MockitoExtension.class)
 class ClientBootstrapServiceTests {

@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv.tenant;
+package io.github.edmaputra.enhauthserv.tenancy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

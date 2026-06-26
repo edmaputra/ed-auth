@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv.application.usecase.introspection;
+package io.github.edmaputra.enhauthserv.tokens.introspection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;

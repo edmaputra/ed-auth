@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv;
+package io.github.edmaputra.enhauthserv.shared;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -8,6 +8,7 @@ import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import org.junit.jupiter.api.Test;
+import io.github.edmaputra.enhauthserv.integration.AuthServerIntegrationTests;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;

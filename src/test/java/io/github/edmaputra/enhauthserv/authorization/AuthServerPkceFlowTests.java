@@ -1,4 +1,4 @@
-package io.github.edmaputra.enhauthserv;
+package io.github.edmaputra.enhauthserv.authorization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import io.github.edmaputra.enhauthserv.integration.AuthServerIntegrationTests;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AuthServerPkceFlowTests extends AuthServerIntegrationTests {
