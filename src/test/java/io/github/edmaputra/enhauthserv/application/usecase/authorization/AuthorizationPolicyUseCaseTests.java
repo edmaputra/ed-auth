@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
-import io.github.edmaputra.enhauthserv.application.port.out.ScopeValidationPort;
+import io.github.edmaputra.enhauthserv.clients.ClientScopeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,13 +16,13 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 class AuthorizationPolicyUseCaseTests {
 
   @Mock
-  private ScopeValidationPort scopeValidationPort;
+  private ClientScopeService clientScopeService;
 
   private AuthorizationPolicyUseCase useCase;
 
   @BeforeEach
   void setUp() {
-    useCase = new AuthorizationPolicyUseCase(scopeValidationPort);
+    useCase = new AuthorizationPolicyUseCase(clientScopeService);
   }
 
   @Test
@@ -30,7 +30,7 @@ class AuthorizationPolicyUseCaseTests {
     // Arrange
     String clientId = "demo-client";
     String requiredScope = "introspection";
-    when(scopeValidationPort.clientHasScope(clientId, requiredScope)).thenReturn(true);
+    when(clientScopeService.clientHasScope(clientId, requiredScope)).thenReturn(true);
 
     ValidateScopeCommand command = new ValidateScopeCommand(
         clientId,
@@ -51,7 +51,7 @@ class AuthorizationPolicyUseCaseTests {
     // Arrange
     String clientId = "demo-client";
     String requiredScope = "introspection";
-    when(scopeValidationPort.clientHasScope(clientId, requiredScope)).thenReturn(false);
+    when(clientScopeService.clientHasScope(clientId, requiredScope)).thenReturn(false);
 
     ValidateScopeCommand command = new ValidateScopeCommand(
         clientId,

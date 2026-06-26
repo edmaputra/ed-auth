@@ -1,7 +1,7 @@
 package io.github.edmaputra.enhauthserv.adapter.out.persistence;
 
-import io.github.edmaputra.enhauthserv.application.port.out.UserClaimsDataPort;
 import io.github.edmaputra.enhauthserv.application.usecase.claims.ClaimType;
+import io.github.edmaputra.enhauthserv.application.usecase.claims.UserClaimsDataPort;
 import io.github.edmaputra.enhauthserv.application.usecase.claims.UserAttributeData;
 import io.github.edmaputra.enhauthserv.application.usecase.claims.UserProfileData;
 import io.github.edmaputra.enhauthserv.entity.ClaimInclusionRule;

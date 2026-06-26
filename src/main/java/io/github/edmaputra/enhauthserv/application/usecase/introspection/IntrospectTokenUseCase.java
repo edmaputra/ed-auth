@@ -1,34 +1,27 @@
 package io.github.edmaputra.enhauthserv.application.usecase.introspection;
 
-import io.github.edmaputra.enhauthserv.application.port.in.AuthorizationPolicyInputPort;
-import io.github.edmaputra.enhauthserv.application.port.in.IntrospectTokenInputPort;
-import io.github.edmaputra.enhauthserv.application.port.out.ClientAuthenticationPort;
-import io.github.edmaputra.enhauthserv.application.port.out.ClientAuthenticationResult;
-import io.github.edmaputra.enhauthserv.application.port.out.TokenIntrospectionPort;
+import io.github.edmaputra.enhauthserv.clients.ClientAuthenticationService;
+import io.github.edmaputra.enhauthserv.clients.ClientAuthenticationResult;
+import io.github.edmaputra.enhauthserv.application.usecase.authorization.AuthorizationPolicyUseCase;
 import io.github.edmaputra.enhauthserv.application.usecase.authorization.AuthorizationPolicyResult;
 import io.github.edmaputra.enhauthserv.application.usecase.authorization.ValidateScopeCommand;
+import io.github.edmaputra.enhauthserv.service.TokenIntrospectionValidator;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 
-public class IntrospectTokenUseCase implements IntrospectTokenInputPort {
+@Service
+@RequiredArgsConstructor
+public class IntrospectTokenUseCase {
 
   private static final String INTROSPECTION_SCOPE = "introspection";
 
-  private final ClientAuthenticationPort clientAuthenticationPort;
-  private final TokenIntrospectionPort tokenIntrospectionPort;
-  private final AuthorizationPolicyInputPort authorizationPolicyInputPort;
+  private final ClientAuthenticationService clientAuthenticationService;
+  private final TokenIntrospectionValidator tokenIntrospectionValidator;
+  private final AuthorizationPolicyUseCase authorizationPolicyUseCase;
 
-  public IntrospectTokenUseCase(
-      ClientAuthenticationPort clientAuthenticationPort,
-      TokenIntrospectionPort tokenIntrospectionPort,
-      AuthorizationPolicyInputPort authorizationPolicyInputPort) {
-    this.clientAuthenticationPort = clientAuthenticationPort;
-    this.tokenIntrospectionPort = tokenIntrospectionPort;
-    this.authorizationPolicyInputPort = authorizationPolicyInputPort;
-  }
-
-  @Override
   public IntrospectTokenResult introspect(IntrospectTokenCommand command) {
     if (command.token() == null || command.token().isEmpty()) {
       return error(
@@ -38,7 +31,7 @@ public class IntrospectTokenUseCase implements IntrospectTokenInputPort {
     }
 
     ClientAuthenticationResult authentication =
-        clientAuthenticationPort.authenticateBasic(command.authorizationHeader());
+        clientAuthenticationService.authenticateBasic(command.authorizationHeader());
     if (!authentication.authenticated()) {
       return error(
           IntrospectTokenResult.Status.UNAUTHORIZED,
@@ -51,7 +44,7 @@ public class IntrospectTokenUseCase implements IntrospectTokenInputPort {
         authentication.clientId(),
         AuthorizationGrantType.CLIENT_CREDENTIALS,
         INTROSPECTION_SCOPE);
-    AuthorizationPolicyResult policyResult = authorizationPolicyInputPort.validateScope(scopeValidation);
+    AuthorizationPolicyResult policyResult = authorizationPolicyUseCase.validateScope(scopeValidation);
 
     if (!policyResult.authorized()) {
       return error(
@@ -60,7 +53,7 @@ public class IntrospectTokenUseCase implements IntrospectTokenInputPort {
           policyResult.errorDescription());
     }
 
-    Map<String, Object> introspectionResponse = tokenIntrospectionPort.introspect(command.token());
+    Map<String, Object> introspectionResponse = tokenIntrospectionValidator.introspect(command.token());
     return new IntrospectTokenResult(IntrospectTokenResult.Status.OK, introspectionResponse);
   }
 

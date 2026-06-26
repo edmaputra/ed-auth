@@ -1,8 +1,8 @@
 package io.github.edmaputra.enhauthserv.application.usecase.claims;
 
-import io.github.edmaputra.enhauthserv.application.port.in.UserClaimsInputPort;
-import io.github.edmaputra.enhauthserv.application.port.out.CurrentTenantPort;
-import io.github.edmaputra.enhauthserv.application.port.out.UserClaimsDataPort;
+import io.github.edmaputra.enhauthserv.tenancy.TenantContext;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -10,7 +10,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public class UserClaimsUseCase implements UserClaimsInputPort {
+@Service
+@RequiredArgsConstructor
+public class UserClaimsUseCase {
 
   private static final String DEFAULT_TENANT = "demo";
 
@@ -18,24 +20,14 @@ public class UserClaimsUseCase implements UserClaimsInputPort {
       "sub", "iss", "aud", "exp", "iat", "nbf", "jti", "scope", "client_id", "azp", "token_type",
       "auth_time", "nonce", "at_hash", "c_hash", "sid", "amr", "acr");
 
-  private final CurrentTenantPort currentTenantPort;
   private final UserClaimsDataPort userClaimsDataPort;
 
-  public UserClaimsUseCase(
-      CurrentTenantPort currentTenantPort,
-      UserClaimsDataPort userClaimsDataPort) {
-    this.currentTenantPort = currentTenantPort;
-    this.userClaimsDataPort = userClaimsDataPort;
-  }
-
-  @Override
   public UserProfileData getOrDefaultProfile(String username) {
     String tenantId = resolveTenantId();
     return userClaimsDataPort.findUserProfile(tenantId, username)
         .orElseGet(() -> defaultProfile(username, tenantId));
   }
 
-  @Override
   public Map<String, Object> getClaims(String username, ClaimType claimType) {
     String tenantId = resolveTenantId();
     List<UserAttributeData> attributes = userClaimsDataPort.findUserAttributes(tenantId, username);
@@ -84,6 +76,6 @@ public class UserClaimsUseCase implements UserClaimsInputPort {
   }
 
   private String resolveTenantId() {
-    return currentTenantPort.currentTenantOrDefault(DEFAULT_TENANT);
+    return TenantContext.getCurrentTenantOrDefault(DEFAULT_TENANT);
   }
 }

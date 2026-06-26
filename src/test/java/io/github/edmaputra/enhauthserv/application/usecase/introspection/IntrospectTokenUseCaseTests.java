@@ -1,30 +1,45 @@
 package io.github.edmaputra.enhauthserv.application.usecase.introspection;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
-import io.github.edmaputra.enhauthserv.application.port.in.AuthorizationPolicyInputPort;
-import io.github.edmaputra.enhauthserv.application.port.out.ClientAuthenticationPort;
-import io.github.edmaputra.enhauthserv.application.port.out.ClientAuthenticationResult;
-import io.github.edmaputra.enhauthserv.application.port.out.TokenIntrospectionPort;
+import io.github.edmaputra.enhauthserv.application.usecase.authorization.AuthorizationPolicyUseCase;
 import io.github.edmaputra.enhauthserv.application.usecase.authorization.AuthorizationPolicyResult;
-import io.github.edmaputra.enhauthserv.application.usecase.authorization.ValidateScopeCommand;
+import io.github.edmaputra.enhauthserv.clients.ClientAuthenticationResult;
+import io.github.edmaputra.enhauthserv.clients.ClientAuthenticationService;
+import io.github.edmaputra.enhauthserv.service.TokenIntrospectionValidator;
 import java.util.Map;
 import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class IntrospectTokenUseCaseTests {
+
+  @Mock
+  private ClientAuthenticationService clientAuthenticationService;
+
+  @Mock
+  private TokenIntrospectionValidator tokenIntrospectionValidator;
+
+  @Mock
+  private AuthorizationPolicyUseCase authorizationPolicyUseCase;
+
+  private IntrospectTokenUseCase useCase;
+
+  @BeforeEach
+  void setUp() {
+    useCase = new IntrospectTokenUseCase(
+        clientAuthenticationService,
+        tokenIntrospectionValidator,
+        authorizationPolicyUseCase);
+  }
 
   @Test
   void missingTokenReturnsBadRequest() {
-    IntrospectTokenUseCase useCase = new IntrospectTokenUseCase(
-      authorizationHeader -> ClientAuthenticationResult.success(
-        "demo-client",
-        "registered-demo-client",
-        Set.of("introspection")),
-        token -> Map.of("active", true),
-        command -> AuthorizationPolicyResult.success());
-
     IntrospectTokenResult result = useCase.introspect(new IntrospectTokenCommand("", "Basic abc"));
 
     assertThat(result.status()).isEqualTo(IntrospectTokenResult.Status.BAD_REQUEST);
@@ -33,10 +48,8 @@ class IntrospectTokenUseCaseTests {
 
   @Test
   void unauthenticatedClientReturnsUnauthorized() {
-    IntrospectTokenUseCase useCase = new IntrospectTokenUseCase(
-        authorizationHeader -> ClientAuthenticationResult.failed(null),
-        token -> Map.of("active", true),
-        command -> AuthorizationPolicyResult.success());
+    when(clientAuthenticationService.authenticateBasic("Basic bad"))
+        .thenReturn(ClientAuthenticationResult.failed(null));
 
     IntrospectTokenResult result = useCase.introspect(new IntrospectTokenCommand("token-value", "Basic bad"));
 
@@ -46,13 +59,13 @@ class IntrospectTokenUseCaseTests {
 
   @Test
   void clientWithoutIntrospectionScopeReturnsForbidden() {
-    IntrospectTokenUseCase useCase = new IntrospectTokenUseCase(
-      authorizationHeader -> ClientAuthenticationResult.success(
-        "demo-client",
-        "registered-demo-client",
-        Set.of("read")),
-        token -> Map.of("active", true),
-        command -> AuthorizationPolicyResult.missingScope("introspection"));
+    when(clientAuthenticationService.authenticateBasic("Basic abc"))
+        .thenReturn(ClientAuthenticationResult.success(
+            "demo-client",
+            "registered-demo-client",
+            Set.of("read")));
+    when(authorizationPolicyUseCase.validateScope(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(AuthorizationPolicyResult.missingScope("introspection"));
 
     IntrospectTokenResult result = useCase.introspect(new IntrospectTokenCommand("token-value", "Basic abc"));
 
@@ -63,13 +76,14 @@ class IntrospectTokenUseCaseTests {
   @Test
   void successfulIntrospectionReturnsOk() {
     Map<String, Object> payload = Map.of("active", true, "client_id", "demo-client");
-    IntrospectTokenUseCase useCase = new IntrospectTokenUseCase(
-      authorizationHeader -> ClientAuthenticationResult.success(
-        "demo-client",
-        "registered-demo-client",
-        Set.of("introspection", "read")),
-        token -> payload,
-        command -> AuthorizationPolicyResult.success());
+    when(clientAuthenticationService.authenticateBasic("Basic abc"))
+        .thenReturn(ClientAuthenticationResult.success(
+            "demo-client",
+            "registered-demo-client",
+            Set.of("introspection", "read")));
+    when(authorizationPolicyUseCase.validateScope(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(AuthorizationPolicyResult.success());
+    when(tokenIntrospectionValidator.introspect("token-value")).thenReturn(payload);
 
     IntrospectTokenResult result = useCase.introspect(new IntrospectTokenCommand("token-value", "Basic abc"));
 

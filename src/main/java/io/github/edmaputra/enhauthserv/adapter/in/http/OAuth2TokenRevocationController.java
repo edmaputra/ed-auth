@@ -1,8 +1,8 @@
 package io.github.edmaputra.enhauthserv.adapter.in.http;
 
-import io.github.edmaputra.enhauthserv.application.port.in.RevokeTokenInputPort;
 import io.github.edmaputra.enhauthserv.application.usecase.revocation.RevokeTokenCommand;
 import io.github.edmaputra.enhauthserv.application.usecase.revocation.RevokeTokenResult;
+import io.github.edmaputra.enhauthserv.application.usecase.revocation.RevokeTokenUseCase;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class OAuth2TokenRevocationController {
 
-  private final RevokeTokenInputPort revokeTokenInputPort;
+  private final RevokeTokenUseCase revokeTokenUseCase;
 
   @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
   public ResponseEntity<?> revoke(
@@ -37,7 +37,7 @@ public class OAuth2TokenRevocationController {
       @RequestParam(value = "token_type_hint", required = false) String tokenTypeHint,
       HttpServletRequest request) {
 
-    RevokeTokenResult result = revokeTokenInputPort.revoke(
+    RevokeTokenResult result = revokeTokenUseCase.revoke(
         new RevokeTokenCommand(token, tokenTypeHint, request.getHeader("Authorization")));
 
     if (result.status() == RevokeTokenResult.Status.OK) {

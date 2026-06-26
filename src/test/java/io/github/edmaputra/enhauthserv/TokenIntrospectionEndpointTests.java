@@ -3,7 +3,7 @@ package io.github.edmaputra.enhauthserv;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import io.github.edmaputra.enhauthserv.tenant.TenantContext;
+import io.github.edmaputra.enhauthserv.tenancy.TenantContext;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

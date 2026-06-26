@@ -1,8 +1,8 @@
 package io.github.edmaputra.enhauthserv.adapter.in.http;
 
-import io.github.edmaputra.enhauthserv.application.port.in.IntrospectTokenInputPort;
 import io.github.edmaputra.enhauthserv.application.usecase.introspection.IntrospectTokenCommand;
 import io.github.edmaputra.enhauthserv.application.usecase.introspection.IntrospectTokenResult;
+import io.github.edmaputra.enhauthserv.application.usecase.introspection.IntrospectTokenUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -27,7 +27,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class OAuth2TokenIntrospectionController {
 
-    private final IntrospectTokenInputPort introspectTokenInputPort;
+    private final IntrospectTokenUseCase introspectTokenUseCase;
 
     /**
      * RFC 7662 Token Introspection endpoint.
@@ -43,7 +43,7 @@ public class OAuth2TokenIntrospectionController {
             HttpServletRequest request) {
 
         log.debug("Received token introspection request");
-        IntrospectTokenResult result = introspectTokenInputPort.introspect(
+        IntrospectTokenResult result = introspectTokenUseCase.introspect(
             new IntrospectTokenCommand(token, request.getHeader("Authorization")));
 
         if (result.status() == IntrospectTokenResult.Status.OK) {

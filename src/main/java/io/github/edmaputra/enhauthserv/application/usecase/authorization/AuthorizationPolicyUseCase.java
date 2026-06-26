@@ -1,8 +1,8 @@
 package io.github.edmaputra.enhauthserv.application.usecase.authorization;
 
-import io.github.edmaputra.enhauthserv.application.port.in.AuthorizationPolicyInputPort;
-import io.github.edmaputra.enhauthserv.application.port.out.ScopeValidationPort;
+import io.github.edmaputra.enhauthserv.clients.ClientScopeService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
 /**
  * Use case for validating authorization policies.
@@ -12,15 +12,15 @@ import lombok.RequiredArgsConstructor;
  * 2. Scopes match the operation being performed
  * 3. Grant type authorization rules are respected
  */
+@Service
 @RequiredArgsConstructor
-public class AuthorizationPolicyUseCase implements AuthorizationPolicyInputPort {
+public class AuthorizationPolicyUseCase {
 
-  private final ScopeValidationPort scopeValidationPort;
+  private final ClientScopeService clientScopeService;
 
-  @Override
   public AuthorizationPolicyResult validateScope(ValidateScopeCommand command) {
     // Verify client has the required scope
-    if (!scopeValidationPort.clientHasScope(command.clientId(), command.requiredScope())) {
+    if (!clientScopeService.clientHasScope(command.clientId(), command.requiredScope())) {
       return AuthorizationPolicyResult.missingScope(command.requiredScope());
     }
 
