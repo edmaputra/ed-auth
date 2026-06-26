@@ -36,7 +36,7 @@ token=8xLOxBtZp8...&token_type_hint=refresh_token
 |---|---|---|
 | `400 Bad Request` | `invalid_request` | Missing `token` parameter |
 | `401 Unauthorized` | `invalid_client` | Client authentication failed |
-| `403 Forbidden` | `unauthorized_client` | Client lacks the `revocation` scope |
+| `403 Forbidden` | `invalid_scope` | Client lacks the `revocation` scope |
 
 ## Flow (`RevokeTokenService`)
 
