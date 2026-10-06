@@ -1,5 +1,8 @@
 package io.github.edmaputra.edidp.users;
 
+import io.github.edmaputra.iam.domain.security.DefaultPasswordValidator;
+import io.github.edmaputra.iam.domain.security.PasswordPolicy;
+import io.github.edmaputra.iam.domain.security.PasswordValidator;
 import java.time.Instant;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
@@ -22,17 +25,36 @@ public class UsersConfig {
   private static final String DEMO_TENANT = "demo";
 
   @Bean
+  public PasswordValidator passwordValidator() {
+    PasswordPolicy policy = new PasswordPolicy(
+        8,
+        128,
+        0,
+        1,
+        0,
+        0,
+        null,
+        null,
+        true);
+    return new DefaultPasswordValidator(policy);
+  }
+
+  @Bean
   @Order(2)
   CommandLineRunner demoUserSeeder(
       JdbcUserDetailsManager userDetailsManager,
-      PasswordEncoder passwordEncoder) {
+      PasswordEncoder passwordEncoder,
+      PasswordValidator passwordValidator) {
     return args -> {
       if (userDetailsManager.userExists("demo-user")) {
         return;
       }
 
+      String rawPassword = "demo-password";
+      passwordValidator.validatePassword(rawPassword, "demo-user");
+
       UserDetails user = User.withUsername("demo-user")
-          .password(passwordEncoder.encode("demo-password"))
+          .password(passwordEncoder.encode(rawPassword))
           .roles("USER")
           .build();
 
